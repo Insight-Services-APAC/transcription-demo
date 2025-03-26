@@ -13,22 +13,43 @@
                     <p class="mb-0">Upload a .DCR file (up to 5GB) for transcription and speaker diarization.</p>
                 </div>
                 
-                <form method="POST" enctype="multipart/form-data">
+                <form method="POST" enctype="multipart/form-data" id="uploadForm">
                     <div class="mb-4">
                         <div class="form-file-container p-4 rounded border border-2 border-dashed text-center position-relative">
                             <input class="form-control position-absolute opacity-0 top-0 start-0 w-100 h-100" 
                                    id="file" name="file" type="file" accept=".dcr" required>
-                            <div class="py-5">
+                            <div class="py-5" id="dropAreaContent">
                                 <i class="fas fa-cloud-upload-alt fa-3x text-primary mb-3"></i>
                                 <h5>Drop your DCR file here</h5>
                                 <p class="text-muted mb-0">or click to browse</p>
+                            </div>
+                            <div class="py-5 d-none" id="fileSelectedContent">
+                                <i class="fas fa-file-audio fa-3x text-success mb-3"></i>
+                                <h5 id="selectedFileName">File selected</h5>
+                                <p class="text-muted mb-0">Click upload to start processing</p>
+                                <p class="text-muted file-size mt-2" id="selectedFileSize"></p>
                             </div>
                         </div>
                         <div class="form-text mt-2">Only .DCR format files are accepted.</div>
                     </div>
                     
+                    <!-- Progress bar (hidden initially) -->
+                    <div class="progress mb-3 d-none" id="uploadProgressContainer">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary" 
+                             id="uploadProgressBar" role="progressbar" style="width: 0%"></div>
+                    </div>
+                    <div id="uploadStatusText" class="text-center mb-3 d-none">
+                        <small class="text-muted">Preparing upload... <span id="uploadPercentage">0%</span></small>
+                    </div>
+                    <div id="uploadStageText" class="text-center mb-3 d-none">
+                        <small class="text-muted">Stage: <span id="currentStage">Local upload</span></small>
+                    </div>
+                    <div id="uploadTimeRemaining" class="text-center mb-3 d-none">
+                        <small class="text-muted">Estimated time remaining: <span id="timeRemaining">Calculating...</span></small>
+                    </div>
+                    
                     <div class="d-grid">
-                        <button type="submit" class="btn btn-primary py-2">
+                        <button type="submit" class="btn btn-primary py-2" id="uploadButton">
                             <i class="fas fa-upload me-2"></i>Upload File
                         </button>
                     </div>
@@ -51,5 +72,317 @@
     .form-file-container:hover {
         background-color: var(--light-bg);
     }
+    
+    .form-file-container.has-file {
+        border-color: var(--primary-color) !important;
+        background-color: rgba(67, 97, 238, 0.05);
+    }
 </style>
-{% endblock %} 
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const fileInput = document.getElementById('file');
+    const dropArea = document.querySelector('.form-file-container');
+    const dropAreaContent = document.getElementById('dropAreaContent');
+    const fileSelectedContent = document.getElementById('fileSelectedContent');
+    const selectedFileName = document.getElementById('selectedFileName');
+    const selectedFileSize = document.getElementById('selectedFileSize');
+    const uploadForm = document.getElementById('uploadForm');
+    const uploadButton = document.getElementById('uploadButton');
+    const uploadProgressContainer = document.getElementById('uploadProgressContainer');
+    const uploadProgressBar = document.getElementById('uploadProgressBar');
+    const uploadStatusText = document.getElementById('uploadStatusText');
+    const uploadPercentage = document.getElementById('uploadPercentage');
+    const uploadStageText = document.getElementById('uploadStageText');
+    const currentStage = document.getElementById('currentStage');
+    const uploadTimeRemaining = document.getElementById('uploadTimeRemaining');
+    const timeRemaining = document.getElementById('timeRemaining');
+    
+    // Format file size in a human-readable way
+    function formatFileSize(bytes) {
+        if (bytes < 1024) {
+            return bytes + ' bytes';
+        } else if (bytes < 1024 * 1024) {
+            return (bytes / 1024).toFixed(2) + ' KB';
+        } else if (bytes < 1024 * 1024 * 1024) {
+            return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+        } else {
+            return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+        }
+    }
+    
+    // Format time remaining in a human-readable way
+    function formatTimeRemaining(seconds) {
+        if (seconds < 60) {
+            return `${Math.round(seconds)} seconds`;
+        } else if (seconds < 3600) {
+            return `${Math.floor(seconds / 60)} minutes ${Math.round(seconds % 60)} seconds`;
+        } else {
+            return `${Math.floor(seconds / 3600)} hours ${Math.floor((seconds % 3600) / 60)} minutes`;
+        }
+    }
+    
+    // Update UI when file is selected
+    fileInput.addEventListener('change', function() {
+        if (fileInput.files.length > 0) {
+            const fileName = fileInput.files[0].name;
+            const fileSize = fileInput.files[0].size;
+            
+            selectedFileName.textContent = fileName;
+            selectedFileSize.textContent = `File size: ${formatFileSize(fileSize)}`;
+            
+            dropArea.classList.add('has-file');
+            dropAreaContent.classList.add('d-none');
+            fileSelectedContent.classList.remove('d-none');
+        } else {
+            dropArea.classList.remove('has-file');
+            dropAreaContent.classList.remove('d-none');
+            fileSelectedContent.classList.add('d-none');
+        }
+    });
+    
+    // Handle form submission with progress bar
+    uploadForm.addEventListener('submit', function(e) {
+        if (fileInput.files.length > 0) {
+            e.preventDefault();
+            
+            const file = fileInput.files[0];
+            const fileSize = file.size;
+            
+            // Display progress elements
+            uploadProgressContainer.classList.remove('d-none');
+            uploadStatusText.classList.remove('d-none');
+            uploadStageText.classList.remove('d-none');
+            uploadTimeRemaining.classList.remove('d-none');
+            
+            // Disable upload button
+            uploadButton.disabled = true;
+            uploadButton.innerHTML = '<i class="fas fa-circle-notch fa-spin me-2"></i>Uploading...';
+            
+            // Create FormData
+            const formData = new FormData(uploadForm);
+            
+            // Create XHR request
+            const xhr = new XMLHttpRequest();
+            
+            // Variables for progress tracking
+            let uploadStartTime = Date.now();
+            let lastLoaded = 0;
+            let uploadSpeed = 0; // bytes per millisecond
+            
+            // Configure progress event - local upload (25% of progress)
+            xhr.upload.addEventListener('progress', function(event) {
+                if (event.lengthComputable) {
+                    // Calculate upload speed
+                    const elapsedTime = Date.now() - uploadStartTime;
+                    if (elapsedTime > 0) {
+                        const loadedChange = event.loaded - lastLoaded;
+                        const timeChange = elapsedTime;
+                        // Moving average for upload speed
+                        uploadSpeed = (uploadSpeed * 0.7) + (loadedChange / timeChange * 0.3);
+                        lastLoaded = event.loaded;
+                        uploadStartTime = Date.now();
+                    }
+                    
+                    // Local upload is 25% of total progress
+                    const localPercentComplete = Math.round((event.loaded / event.total) * 100);
+                    const totalPercentComplete = Math.round(localPercentComplete * 0.25);
+                    
+                    // Update progress bar
+                    uploadProgressBar.style.width = totalPercentComplete + '%';
+                    uploadPercentage.textContent = totalPercentComplete + '%';
+                    currentStage.textContent = 'Local upload';
+                    
+                    // Estimate time remaining for local upload
+                    if (uploadSpeed > 0) {
+                        const remainingBytes = event.total - event.loaded;
+                        const remainingTimeMs = remainingBytes / uploadSpeed;
+                        const remainingTimeSec = remainingTimeMs / 1000;
+                        timeRemaining.textContent = formatTimeRemaining(remainingTimeSec);
+                    }
+                }
+            });
+            
+            // Configure load event (successful local upload)
+            xhr.addEventListener('load', function() {
+                if (xhr.status === 200) {
+                    // Log the response for debugging
+                    console.log("Server response:", xhr.responseText);
+                    
+                    try {
+                        // Local upload complete, now update for azure upload (remaining 75%)
+                        uploadStatusText.innerHTML = '<small class="text-muted">Uploading to Azure storage...</small>';
+                        currentStage.textContent = 'Azure storage upload';
+                        
+                        // Parse the JSON response to get upload_id
+                        const response = JSON.parse(xhr.responseText);
+                        if (response.upload_id) {
+                            // Start polling for azure upload progress
+                            pollAzureUploadProgress(response.upload_id, fileSize);
+                        } else {
+                            handleUploadError('Invalid server response');
+                        }
+                    } catch (e) {
+                        // Server responded but not with expected JSON
+                        console.error("JSON parse error", e, "Response was:", xhr.responseText);
+                        handleUploadError('Error parsing server response: ' + e.message);
+                    }
+                } else {
+                    // Handle local upload errors
+                    handleUploadError('Upload failed with status ' + xhr.status);
+                }
+            });
+            
+            // Configure error event
+            xhr.addEventListener('error', function() {
+                handleUploadError('Network error occurred');
+            });
+            
+            // Open and send the request to a special endpoint that returns upload ID
+            xhr.open('POST', '/upload/start', true);
+            xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+            xhr.send(formData);
+        }
+    });
+    
+    // Poll for Azure upload progress
+    function pollAzureUploadProgress(uploadId, fileSize) {
+        const pollInterval = 1000; // 1 second
+        const maxPolls = 1800; // 30 minutes max
+        let pollCount = 0;
+        let lastAzureProgress = 0;
+        let azureUploadStartTime = Date.now();
+        let azureUploadSpeed = 0;
+        
+        const progressInterval = setInterval(function() {
+            pollCount++;
+            
+            // Check if we've reached the maximum number of polls
+            if (pollCount > maxPolls) {
+                clearInterval(progressInterval);
+                handleUploadError('Upload timeout after 30 minutes');
+                return;
+            }
+            
+            // Fetch progress from server
+            fetch(`/upload/progress/${uploadId}`)
+                .then(response => response.json())
+                .then(data => {
+                    // Log the response for debugging
+                    console.log("Progress response:", data);
+                    
+                    if (data.error) {
+                        clearInterval(progressInterval);
+                        handleUploadError(data.error);
+                        return;
+                    }
+                    
+                    if (data.status === 'completed') {
+                        // Upload complete
+                        clearInterval(progressInterval);
+                        uploadProgressBar.style.width = '100%';
+                        uploadPercentage.textContent = '100%';
+                        uploadStatusText.innerHTML = '<small class="text-success">Upload complete! Processing file...</small>';
+                        currentStage.textContent = 'Processing';
+                        
+                        // Redirect to the file detail page
+                        if (data.redirect_url) {
+                            window.location.href = data.redirect_url;
+                        } else {
+                            window.location.href = '/files';
+                        }
+                        return;
+                    }
+                    
+                    if (data.status === 'uploading' && data.progress !== undefined) {
+                        // Calculate Azure upload speed
+                        const elapsedTime = Date.now() - azureUploadStartTime;
+                        const progressChange = data.progress - lastAzureProgress;
+                        
+                        if (elapsedTime > 0 && progressChange > 0) {
+                            const bytesUploaded = fileSize * (progressChange / 100);
+                            azureUploadSpeed = (azureUploadSpeed * 0.7) + ((bytesUploaded / elapsedTime) * 0.3);
+                            lastAzureProgress = data.progress;
+                            azureUploadStartTime = Date.now();
+                        }
+                        
+                        // Azure upload is remaining 75% of progress
+                        const azurePercentComplete = data.progress;
+                        const totalPercentComplete = 25 + (azurePercentComplete * 0.75);
+                        
+                        // Update progress bar
+                        uploadProgressBar.style.width = totalPercentComplete + '%';
+                        uploadPercentage.textContent = Math.round(totalPercentComplete) + '%';
+                        
+                        // Estimate time remaining for Azure upload
+                        if (azureUploadSpeed > 0) {
+                            const remainingPercent = 100 - azurePercentComplete;
+                            const remainingBytes = fileSize * (remainingPercent / 100);
+                            const remainingTimeMs = remainingBytes / azureUploadSpeed;
+                            const remainingTimeSec = remainingTimeMs / 1000;
+                            timeRemaining.textContent = formatTimeRemaining(remainingTimeSec);
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Error polling for progress:', error);
+                    // Don't clear interval on network errors, just try again
+                });
+        }, pollInterval);
+    }
+    
+    // Handle upload errors
+    function handleUploadError(message) {
+        uploadButton.disabled = false;
+        uploadButton.innerHTML = '<i class="fas fa-upload me-2"></i>Try Again';
+        uploadStatusText.innerHTML = `<small class="text-danger">Error: ${message}</small>`;
+        timeRemaining.textContent = 'N/A';
+        console.error('Upload error:', message);
+    }
+    
+    // Prevent defaults for drag and drop
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropArea.addEventListener(eventName, preventDefaults, false);
+    });
+    
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+    
+    // Highlight drop area when dragging over it
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropArea.addEventListener(eventName, highlight, false);
+    });
+    
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropArea.addEventListener(eventName, unhighlight, false);
+    });
+    
+    function highlight() {
+        dropArea.classList.add('has-file');
+    }
+    
+    function unhighlight() {
+        if (fileInput.files.length === 0) {
+            dropArea.classList.remove('has-file');
+        }
+    }
+    
+    // Handle dropped files
+    dropArea.addEventListener('drop', handleDrop, false);
+    
+    function handleDrop(e) {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        fileInput.files = files;
+        
+        // Trigger change event to update UI
+        const event = new Event('change');
+        fileInput.dispatchEvent(event);
+    }
+});
+</script>
+{% endblock %}
