@@ -112,7 +112,11 @@ def transcribe_file(file_id):
                 session.commit()
 
                 # Retrieve final transcription JSON
+                logger.info("Retrieving final transcription JSON for job %s", transcription_id)
                 result_json = transcription_service.get_transcription_result(transcription_id)
+                
+                # Add the snippet here:
+                logger.info("Final batch-transcription JSON:\n%s", json.dumps(result_json, indent=2))
 
                 # Store the JSON in Blob Storage
                 logger.info("Uploading final transcription JSON to Azure Blob.")

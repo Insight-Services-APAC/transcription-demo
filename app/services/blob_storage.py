@@ -7,7 +7,7 @@ from azure.storage.blob import (
     BlobSasPermissions
 )
 from werkzeug.utils import secure_filename
-import datetime
+from datetime import datetime, timedelta
 import threading
 import json
 
@@ -122,7 +122,7 @@ class BlobStorageService:
             # We assume the service client is authenticated by account key
             account_key = self.blob_service_client.credential.account_key
 
-            expiry_time = datetime.datetime.utcnow() + datetime.timedelta(hours=24)
+            expiry_time = datetime.utcnow() + timedelta(hours=24)
             sas_token = generate_blob_sas(
                 account_name=account_name,
                 container_name=self.container_name,
@@ -179,7 +179,7 @@ class BlobStorageService:
         # Generate SAS
         account_name = self.blob_service_client.account_name
         account_key = self.blob_service_client.credential.account_key
-        expiry_time = datetime.datetime.utcnow() + datetime.timedelta(hours=24)
+        expiry_time = datetime.utcnow() + timedelta(hours=24)
 
         sas_token = generate_blob_sas(
             account_name=account_name,
