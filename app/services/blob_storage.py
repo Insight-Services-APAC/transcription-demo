@@ -209,38 +209,3 @@ class BlobStorageService:
             ".txt": "text/plain",
         }
         return content_types.get(extension, "application/octet-stream")
-
-    # ------------------- NEW METHOD ADDED BELOW ------------------- #
-    def generate_sas_url_from_blob_path(self, blob_path, expiry_hours=24):
-        """
-        Given an existing blob path in this container, generate a new SAS URL
-        with read permission valid for `expiry_hours` hours.
-        """
-        account_name = self.blob_service_client.account_name
-        account_key = self.blob_service_client.credential.account_key
-        expiry_time = datetime.utcnow() + timedelta(hours=expiry_hours)
-
-        sas_token = generate_blob_sas(
-            account_name=account_name,
-            container_name=self.container_name,
-            blob_name=blob_path,
-            account_key=account_key,
-            permission=BlobSasPermissions(read=True),
-            expiry=expiry_time
-        )
-        sas_url = f"https://{account_name}.blob.core.windows.net/{self.container_name}/{blob_path}?{sas_token}"
-        return sas_url
-
-    @staticmethod
-    def parse_blob_path_from_sas_url(sas_url):
-        """
-        Utility function to parse out the blob path from an existing SAS or
-        direct blob URL: https://<account>.blob.core.windows.net/<container>/<path>?...
-        Returns just the <path> portion (i.e. everything after the container name).
-        """
-        parsed = urlparse(sas_url)
-        # parsed.path is like "/container_name/some_folder/file.json"
-        parts = parsed.path.split('/', 2)  # ['', 'container_name', 'some_folder/file.json']
-        if len(parts) < 3:
-            raise ValueError(f"Could not parse blob path from SAS URL: {sas_url}")
-        return parts[2]

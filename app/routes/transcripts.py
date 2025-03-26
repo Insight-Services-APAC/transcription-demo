@@ -48,11 +48,8 @@ def api_transcript(file_id):
         # Extract the blob path from the transcript_url
         blob_path = blob_service.parse_blob_path_from_sas_url(file.transcript_url)
 
-        # Generate a fresh SAS URL for the same blob path (24h default)
-        fresh_sas_url = blob_service.generate_sas_url_from_blob_path(blob_path)
-
         # Fetch transcript JSON from that fresh SAS URL
-        response = requests.get(fresh_sas_url)
+        response = requests.get(file.transcript_url)
         response.raise_for_status()
         transcript_data = response.json()
 
