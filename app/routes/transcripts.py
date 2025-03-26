@@ -3,6 +3,8 @@ from app.models import db_session
 from app.models.file import File
 import json
 import requests
+from app.services.blob_storage import BlobStorageService
+import traceback
 
 transcripts_bp = Blueprint('transcripts', __name__)
 
@@ -23,7 +25,11 @@ def view_transcript(file_id):
 
 @transcripts_bp.route('/api/transcript/<file_id>')
 def api_transcript(file_id):
-    """API endpoint to get transcript data"""
+    """
+    API endpoint to get transcript data.
+    This endpoint regenerates a fresh SAS URL using blob_storage.py
+    before fetching the transcript JSON (to avoid expired SAS URLs).
+    """
     file = db_session.query(File).filter(File.id == file_id).first()
     if file is None:
         return jsonify({"error": "File not found"}), 404
@@ -33,18 +39,30 @@ def api_transcript(file_id):
         return jsonify({"error": "Transcript not available"}), 404
 
     try:
-        # Fetch transcript JSON from blob storage
-        response = requests.get(file.transcript_url)
-        response.raise_for_status()
+        # Create BlobStorageService to regenerate a full SAS URL
+        blob_service = BlobStorageService(
+            connection_string=current_app.config['AZURE_STORAGE_CONNECTION_STRING'],
+            container_name=current_app.config['AZURE_STORAGE_CONTAINER']
+        )
 
+        # Extract the blob path from the transcript_url
+        blob_path = blob_service.parse_blob_path_from_sas_url(file.transcript_url)
+
+        # Generate a fresh SAS URL for the same blob path (24h default)
+        fresh_sas_url = blob_service.generate_sas_url_from_blob_path(blob_path)
+
+        # Fetch transcript JSON from that fresh SAS URL
+        response = requests.get(fresh_sas_url)
+        response.raise_for_status()
         transcript_data = response.json()
-        
+
         # Process the transcript data to make it more frontend-friendly
         processed_data = process_transcript_data(transcript_data)
-        
+
         return jsonify(processed_data)
 
     except Exception as e:
+        traceback.print_exc()
         return jsonify({"error": f"Error fetching transcript: {str(e)}"}), 500
 
 
@@ -76,14 +94,17 @@ def process_transcript_data(data):
             # Skip phrases with no results
             if phrase.get("recognitionStatus") != "Success" or not phrase.get("nBest") or len(phrase["nBest"]) == 0:
                 continue
-                
+
             # Get the best recognition option
             best_result = phrase["nBest"][0]
-            
-            # Create a segment
+
+            # Create a segment with time offsets
             segment = {
                 "start": phrase.get("offset", "0:00:00"),
-                "end": add_time_strings(phrase.get("offset", "0:00:00"), phrase.get("duration", "0:00:00")),
+                "end": add_time_strings(
+                    phrase.get("offset", "0:00:00"), 
+                    phrase.get("duration", "0:00:00")
+                ),
                 "offsetMilliseconds": phrase.get("offsetMilliseconds", 0),
                 "durationMilliseconds": phrase.get("durationMilliseconds", 0),
                 "speaker": phrase.get("speaker", 0),
@@ -91,7 +112,7 @@ def process_transcript_data(data):
                 "confidence": best_result.get("confidence", 0),
                 "words": []
             }
-            
+
             # Add word-level details if available
             if "words" in best_result:
                 segment["words"] = [
@@ -105,17 +126,17 @@ def process_transcript_data(data):
                     }
                     for word in best_result["words"]
                 ]
-            
+
             segments.append(segment)
-        
+
         # Sort segments by time
         result["segments"] = sorted(segments, key=lambda x: x["offsetMilliseconds"])
-    
+
     return result
 
 
 def add_time_strings(time1, time2):
-    """Add two time strings in HH:MM:SS format"""
+    """Add two time strings in HH:MM:SS or HH:MM:SS.msec format"""
     # Convert to seconds
     def to_seconds(time_str):
         parts = time_str.split(':')
