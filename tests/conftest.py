@@ -3,26 +3,52 @@ import pytest
 import tempfile
 import shutil
 from app import create_app
-from app.models import init_db, db_session, engine
-from app.models.file import Base, File
 import uuid
 from datetime import datetime
+from unittest import mock
+from sqlalchemy import create_engine
+from sqlalchemy.orm import scoped_session, sessionmaker
+from sqlalchemy.ext.declarative import declarative_base
 
 
 @pytest.fixture(scope='session')
 def app():
     """Create and configure a Flask app for testing."""
-    app = create_app('testing')
+    # Create the Flask app with testing config
+    flask_app = create_app('testing')
 
     # Establish application context
-    with app.app_context():
-        # Make sure we initialize the database
-        init_db(app)
+    with flask_app.app_context():
+        # Initialize database explicitly
+        from app.models.file import Base
+
+        # Create an in-memory SQLite database for testing
+        engine = create_engine('sqlite:///:memory:')
+        db_session = scoped_session(sessionmaker(
+            autocommit=False, autoflush=False, bind=engine))
+        Base.query = db_session.query_property()
+
+        # Import models to ensure they're registered with the metadata
+        from app.models.file import File
 
         # Create all tables
         Base.metadata.create_all(bind=engine)
 
-        yield app
+        # Make the session and engine available to the app
+        flask_app.db_session = db_session
+        flask_app.engine = engine
+
+        # Replace the existing db_session in app.models
+        import app.models
+        app.models.db_session = db_session
+        app.models.engine = engine
+
+        # Add a teardown to clean up the session
+        @flask_app.teardown_appcontext
+        def shutdown_session(exception=None):
+            db_session.remove()
+
+        yield flask_app
 
 
 @pytest.fixture(scope='function')
@@ -40,11 +66,13 @@ def runner(app):
 @pytest.fixture(scope='function')
 def db(app):
     """Set up a clean database session for a test."""
-    from app.models import db_session
-
     with app.app_context():
-        # Start with a clean session for each test
+        # Use the session from the app
+        db_session = app.db_session
+        db_session.begin_nested()  # Create a savepoint
+
         yield db_session
+
         # Clean up after the test
         db_session.rollback()
 
@@ -53,8 +81,11 @@ def db(app):
 def sample_file(app, db):
     """Create a sample file record."""
     with app.app_context():
+        from app.models.file import File
+
+        file_id = str(uuid.uuid4())
         file = File(
-            id=str(uuid.uuid4()),
+            id=file_id,
             filename='test_file.dcr',
             upload_time=datetime.utcnow(),
             status='uploaded',
@@ -63,19 +94,26 @@ def sample_file(app, db):
         db.add(file)
         db.commit()
 
+        # Store the ID for safe cleanup
         yield file
 
-        # Clean up
-        db.query(File).filter(File.id == file.id).delete()
-        db.commit()
+        # Clean up safely - don't rely on the file object which might be detached
+        try:
+            db.execute(f"DELETE FROM files WHERE id = '{file_id}'")
+            db.commit()
+        except Exception:
+            db.rollback()
 
 
 @pytest.fixture(scope='function')
 def processed_file(app, db):
     """Create a processed file record."""
     with app.app_context():
+        from app.models.file import File
+
+        file_id = str(uuid.uuid4())
         file = File(
-            id=str(uuid.uuid4()),
+            id=file_id,
             filename='processed_file.dcr',
             upload_time=datetime.utcnow(),
             status='completed',
@@ -88,11 +126,15 @@ def processed_file(app, db):
         db.add(file)
         db.commit()
 
+        # Store the ID for safe cleanup
         yield file
 
-        # Clean up
-        db.query(File).filter(File.id == file.id).delete()
-        db.commit()
+        # Clean up safely - don't rely on the file object which might be detached
+        try:
+            db.execute(f"DELETE FROM files WHERE id = '{file_id}'")
+            db.commit()
+        except Exception:
+            db.rollback()
 
 
 @pytest.fixture
@@ -220,19 +262,36 @@ def mock_services(monkeypatch):
     }
 
 
+# Simplified mock_celery fixture that doesn't use patching
 @pytest.fixture(scope='session', autouse=True)
-def mock_celery(monkeypatch):
+def mock_celery():
     """Mock celery task execution to run synchronously"""
-    def mock_delay(*args, **kwargs):
-        from app.tasks.transcription_tasks import transcribe_file as task_func
-        return task_func(*args, **kwargs)
-
+    # Mock the delay method of transcribe_file
     from app.tasks.transcription_tasks import transcribe_file
-    monkeypatch.setattr(transcribe_file, 'delay', mock_delay)
+
+    # Store original method if it exists
+    original_delay = getattr(transcribe_file, 'delay', None)
+
+    # Create a simpler mock that doesn't rely on patching
+    def mock_delay(*args, **kwargs):
+        return transcribe_file(*args, **kwargs)
+
+    # Directly replace the method
+    transcribe_file.delay = mock_delay
+
+    yield
+
+    # Try to restore if needed, but don't fail if it's not possible
+    if original_delay:
+        try:
+            transcribe_file.delay = original_delay
+        except Exception:
+            pass
 
 
+# Fixed: Use direct attribute setting instead of context manager
 @pytest.fixture(scope='session', autouse=True)
-def mock_redis(monkeypatch):
+def mock_redis():
     """Mock Redis connection for testing"""
     class MockRedis:
         def __init__(self, *args, **kwargs):
@@ -244,13 +303,20 @@ def mock_redis(monkeypatch):
         def set(self, key, value):
             self.data[key] = value
 
-    # If your code imports Redis directly
+    # Use direct patching
     import redis
-    monkeypatch.setattr(redis, 'Redis', MockRedis)
+    original_redis = redis.Redis
+    redis.Redis = MockRedis
+
+    yield
+
+    # Restore original
+    redis.Redis = original_redis
 
 
+# Fixed: Use direct attribute setting instead of context manager
 @pytest.fixture(scope='session', autouse=True)
-def mock_external_services(monkeypatch):
+def mock_external_services():
     """Mock external service dependencies"""
     # Mock blob storage service
     class MockBlobStorageService:
@@ -263,9 +329,28 @@ def mock_external_services(monkeypatch):
         def download_file(self, *args, **kwargs):
             return "/tmp/mock-downloaded-file"
 
-    # Apply mocks
+    # Apply direct patching
     from app.services import blob_storage
-    monkeypatch.setattr(blob_storage, 'BlobStorageService',
-                        MockBlobStorageService)
+    original_service = blob_storage.BlobStorageService
+    blob_storage.BlobStorageService = MockBlobStorageService
 
-    # Similarly mock other services as needed
+    yield
+
+    # Restore
+    blob_storage.BlobStorageService = original_service
+
+
+# Set mock environment variables for testing
+@pytest.fixture(scope='session', autouse=True)
+def mock_env_vars():
+    """Set mock environment variables for testing."""
+    os.environ['AZURE_STORAGE_CONNECTION_STRING'] = 'mock-connection-string'
+    os.environ['AZURE_SPEECH_KEY'] = 'mock-speech-key'
+    os.environ['PYANNOTE_AUTH_TOKEN'] = 'mock-auth-token'
+
+    yield
+
+    # Clean up after tests
+    os.environ.pop('AZURE_STORAGE_CONNECTION_STRING', None)
+    os.environ.pop('AZURE_SPEECH_KEY', None)
+    os.environ.pop('PYANNOTE_AUTH_TOKEN', None)

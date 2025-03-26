@@ -21,14 +21,11 @@ class Config:
     AZURE_SPEECH_KEY = os.environ.get('AZURE_SPEECH_KEY')
     AZURE_SPEECH_REGION = os.environ.get('AZURE_SPEECH_REGION', 'eastus')
 
-    # Celery Configuration
+    # Celery Configuration - Use consistent naming (new style)
     broker_url = os.environ.get(
         'CELERY_BROKER_URL', 'redis://localhost:6379/0')
     result_backend = os.environ.get(
         'CELERY_RESULT_BACKEND', 'redis://localhost:6379/0')
-    # Keep old keys for backward compatibility (will be removed in future)
-    CELERY_BROKER_URL = broker_url
-    CELERY_RESULT_BACKEND = result_backend
     broker_connection_retry_on_startup = True
 
     # Audio Processing
@@ -53,6 +50,10 @@ class TestingConfig(Config):
     SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
     WTF_CSRF_ENABLED = False
     SERVER_NAME = 'localhost.localdomain'
+
+    # Make sure we use the same style (new style) for Celery config in testing
+    broker_url = 'memory://'
+    result_backend = 'memory://'
 
 
 config = {

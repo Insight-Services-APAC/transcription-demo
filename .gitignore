@@ -61,3 +61,5 @@ digest.txt
 **/ingest.sh
 
 .pytest_cache/
+
+output.txt
