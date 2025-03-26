@@ -1,0 +1,289 @@
+{% extends "base.html" %}
+
+{% block title %}Transcript - {{ file.filename }} - Transcription App{% endblock %}
+
+{% block styles %}
+<style>
+    .speaker-segment {
+        padding: 15px;
+        margin-bottom: 10px;
+        border-radius: 5px;
+        border-left: 5px solid #ccc;
+    }
+    
+    .speaker-1 { border-left-color: #007bff; }
+    .speaker-2 { border-left-color: #28a745; }
+    .speaker-3 { border-left-color: #dc3545; }
+    .speaker-4 { border-left-color: #fd7e14; }
+    .speaker-5 { border-left-color: #6f42c1; }
+    .speaker-6 { border-left-color: #e83e8c; }
+    
+    .timestamp {
+        color: #6c757d;
+        font-size: 0.8rem;
+        margin-right: 10px;
+    }
+    
+    .speaker-label {
+        font-weight: bold;
+        margin-right: 10px;
+    }
+    
+    .speaker-1 .speaker-label { color: #007bff; }
+    .speaker-2 .speaker-label { color: #28a745; }
+    .speaker-3 .speaker-label { color: #dc3545; }
+    .speaker-4 .speaker-label { color: #fd7e14; }
+    .speaker-5 .speaker-label { color: #6f42c1; }
+    .speaker-6 .speaker-label { color: #e83e8c; }
+    
+    .active-segment {
+        background-color: #f8f9fa;
+    }
+    
+    #audio-player {
+        position: sticky;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background-color: rgba(255, 255, 255, 0.9);
+        padding: 10px;
+        border-top: 1px solid #dee2e6;
+        z-index: 100;
+    }
+    
+    .transcript-section {
+        max-height: calc(100vh - 250px);
+        overflow-y: auto;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="mb-0">
+        <i class="fas fa-file-alt me-2"></i>Transcript
+    </h1>
+    <div>
+        <a href="{{ url_for('files.file_detail', file_id=file.id) }}" class="btn btn-outline-primary me-2">
+            <i class="fas fa-info-circle me-1"></i> File Details
+        </a>
+        <a href="{{ url_for('files.file_list') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-1"></i> Back to Files
+        </a>
+    </div>
+</div>
+
+<div class="card shadow mb-4">
+    <div class="card-header bg-primary text-white">
+        <div class="d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">{{ file.filename }}</h5>
+            <div>
+                <a href="{{ file.audio_url }}" class="btn btn-sm btn-light" target="_blank" download>
+                    <i class="fas fa-download me-1"></i> Download Audio
+                </a>
+                <a href="{{ file.transcript_url }}" class="btn btn-sm btn-light ms-2" target="_blank" download>
+                    <i class="fas fa-download me-1"></i> Download JSON
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="card-body p-0">
+        <div class="transcript-section p-3" id="transcript-container">
+            <div class="text-center py-5">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-2">Loading transcript...</p>
+            </div>
+        </div>
+    </div>
+    
+    <div id="audio-player" class="card-footer">
+        <div class="row align-items-center">
+            <div class="col-md-6">
+                <audio id="audio-element" controls class="w-100">
+                    <source src="{{ file.audio_url }}" type="audio/wav">
+                    Your browser does not support the audio element.
+                </audio>
+            </div>
+            <div class="col-md-6">
+                <div class="btn-group w-100">
+                    <button id="btn-play-pause" class="btn btn-primary">
+                        <i class="fas fa-play"></i> Play
+                    </button>
+                    <button id="btn-jump-back" class="btn btn-secondary">
+                        <i class="fas fa-backward"></i> -10s
+                    </button>
+                    <button id="btn-jump-forward" class="btn btn-secondary">
+                        <i class="fas fa-forward"></i> +10s
+                    </button>
+                    <button id="btn-playback-speed" class="btn btn-info">
+                        1.0x
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const transcriptContainer = document.getElementById('transcript-container');
+    const audioElement = document.getElementById('audio-element');
+    const btnPlayPause = document.getElementById('btn-play-pause');
+    const btnJumpBack = document.getElementById('btn-jump-back');
+    const btnJumpForward = document.getElementById('btn-jump-forward');
+    const btnPlaybackSpeed = document.getElementById('btn-playback-speed');
+    
+    let transcript = [];
+    let currentSegment = null;
+    const speedLevels = [0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
+    let currentSpeedIndex = 1; // Start at 1.0x
+    
+    // Fetch transcript data
+    fetch('/api/transcript/{{ file.id }}')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Failed to load transcript');
+            }
+            return response.json();
+        })
+        .then(data => {
+            transcript = data;
+            renderTranscript();
+        })
+        .catch(error => {
+            transcriptContainer.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    ${error.message}
+                </div>
+            `;
+        });
+    
+    // Render transcript
+    function renderTranscript() {
+        if (!transcript || transcript.length === 0) {
+            transcriptContainer.innerHTML = '<div class="alert alert-warning">No transcript data found.</div>';
+            return;
+        }
+        
+        let html = '';
+        let speakerMap = {}; // Map to track speaker number assignments
+        let speakerCount = 0;
+        
+        // First pass: assign consistent speaker numbers
+        transcript.forEach(segment => {
+            if (!speakerMap[segment.speaker]) {
+                speakerCount++;
+                speakerMap[segment.speaker] = speakerCount;
+            }
+        });
+        
+        // Second pass: generate HTML
+        transcript.forEach((segment, index) => {
+            const speakerNum = speakerMap[segment.speaker] % 6 || 6; // Limit to 6 colors, cycling
+            const timeStr = `${segment.start} - ${segment.end}`;
+            
+            html += `
+                <div class="speaker-segment speaker-${speakerNum}" data-index="${index}" data-start="${timeToSeconds(segment.start)}" data-end="${timeToSeconds(segment.end)}">
+                    <span class="timestamp">${timeStr}</span>
+                    <span class="speaker-label">${segment.speaker}</span>
+                    <span class="segment-text">${segment.text}</span>
+                </div>
+            `;
+        });
+        
+        transcriptContainer.innerHTML = html;
+        
+        // Add click event listeners to segments
+        document.querySelectorAll('.speaker-segment').forEach(segment => {
+            segment.addEventListener('click', function() {
+                const startTime = parseFloat(this.dataset.start);
+                audioElement.currentTime = startTime;
+                audioElement.play();
+            });
+        });
+    }
+    
+    // Update active segment while playing
+    audioElement.addEventListener('timeupdate', function() {
+        const currentTime = audioElement.currentTime;
+        
+        // Find current segment
+        const segments = document.querySelectorAll('.speaker-segment');
+        let activeSegment = null;
+        
+        segments.forEach(segment => {
+            const start = parseFloat(segment.dataset.start);
+            const end = parseFloat(segment.dataset.end);
+            
+            if (currentTime >= start && currentTime <= end) {
+                activeSegment = segment;
+            }
+            
+            // Remove active class from all segments
+            segment.classList.remove('active-segment');
+        });
+        
+        // Add active class to current segment
+        if (activeSegment) {
+            activeSegment.classList.add('active-segment');
+            
+            // Scroll to active segment if it changed
+            if (currentSegment !== activeSegment) {
+                currentSegment = activeSegment;
+                activeSegment.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+    });
+    
+    // Play/Pause button
+    btnPlayPause.addEventListener('click', function() {
+        if (audioElement.paused) {
+            audioElement.play();
+            btnPlayPause.innerHTML = '<i class="fas fa-pause"></i> Pause';
+        } else {
+            audioElement.pause();
+            btnPlayPause.innerHTML = '<i class="fas fa-play"></i> Play';
+        }
+    });
+    
+    // Jump back 10 seconds
+    btnJumpBack.addEventListener('click', function() {
+        audioElement.currentTime = Math.max(0, audioElement.currentTime - 10);
+    });
+    
+    // Jump forward 10 seconds
+    btnJumpForward.addEventListener('click', function() {
+        audioElement.currentTime = Math.min(audioElement.duration, audioElement.currentTime + 10);
+    });
+    
+    // Playback speed control
+    btnPlaybackSpeed.addEventListener('click', function() {
+        currentSpeedIndex = (currentSpeedIndex + 1) % speedLevels.length;
+        const newSpeed = speedLevels[currentSpeedIndex];
+        audioElement.playbackRate = newSpeed;
+        btnPlaybackSpeed.textContent = `${newSpeed.toFixed(2)}x`;
+    });
+    
+    // Update play/pause button when audio state changes
+    audioElement.addEventListener('play', function() {
+        btnPlayPause.innerHTML = '<i class="fas fa-pause"></i> Pause';
+    });
+    
+    audioElement.addEventListener('pause', function() {
+        btnPlayPause.innerHTML = '<i class="fas fa-play"></i> Play';
+    });
+    
+    // Helper function to convert "HH:MM:SS" to seconds
+    function timeToSeconds(timeStr) {
+        const [hours, minutes, seconds] = timeStr.split(':').map(Number);
+        return hours * 3600 + minutes * 60 + seconds;
+    }
+});
+</script>
+{% endblock %}

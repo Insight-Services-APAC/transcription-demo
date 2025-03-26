@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block title %}Upload DCR File - Transcription App{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white">
+                <h3 class="card-title mb-0">
+                    <i class="fas fa-upload me-2"></i>Upload DCR File
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>Instructions:</strong> Upload a .DCR file (up to 5GB) for transcription and speaker diarization.
+                </div>
+                
+                <form method="POST" enctype="multipart/form-data" class="mt-4">
+                    <div class="mb-4">
+                        <label for="file" class="form-label fw-bold">Select DCR File</label>
+                        <input class="form-control form-control-lg" id="file" name="file" type="file" accept=".dcr" required>
+                        <div class="form-text">Only .DCR format files are accepted.</div>
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fas fa-cloud-upload-alt me-2"></i>Upload
+                        </button>
+                    </div>
+                </form>
+            </div>
+            <div class="card-footer bg-light">
+                <div class="small text-muted">
+                    <i class="fas fa-info-circle me-1"></i>
+                    After uploading, you'll be redirected to the files page where you can start the transcription process.
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mt-4 shadow">
+            <div class="card-header bg-secondary text-white">
+                <h4 class="card-title mb-0">
+                    <i class="fas fa-cog me-2"></i>Process Overview
+                </h4>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-md-4 mb-3">
+                        <div class="p-3 border rounded">
+                            <div class="display-5 text-primary mb-2">
+                                <i class="fas fa-file-upload"></i>
+                            </div>
+                            <h5>1. Upload</h5>
+                            <p class="small text-muted">Upload your .DCR file to our secure storage</p>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <div class="p-3 border rounded">
+                            <div class="display-5 text-primary mb-2">
+                                <i class="fas fa-microphone-alt"></i>
+                            </div>
+                            <h5>2. Process</h5>
+                            <p class="small text-muted">We extract audio, transcribe, and identify speakers</p>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <div class="p-3 border rounded">
+                            <div class="display-5 text-primary mb-2">
+                                <i class="fas fa-file-alt"></i>
+                            </div>
+                            <h5>3. Review</h5>
+                            <p class="small text-muted">Access your speaker-labeled transcript with audio playback</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

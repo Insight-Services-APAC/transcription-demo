@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+
+{% block title %}File Details - {{ file.filename }} - Transcription App{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="mb-0">
+        <i class="fas fa-file-audio me-2"></i>File Details
+    </h1>
+    <a href="{{ url_for('files.file_list') }}" class="btn btn-outline-primary">
+        <i class="fas fa-arrow-left me-1"></i> Back to Files
+    </a>
+</div>
+
+<div class="row">
+    <div class="col-lg-4">
+        <div class="card mb-4 shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-info-circle me-2"></i>File Information
+                </h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-borderless mb-0">
+                    <tr>
+                        <td class="fw-bold">Filename:</td>
+                        <td>{{ file.filename }}</td>
+                    </tr>
+                    <tr>
+                        <td class="fw-bold">Upload Time:</td>
+                        <td>{{ file.upload_time.strftime('%Y-%m-%d %H:%M') }}</td>
+                    </tr>
+                    <tr>
+                        <td class="fw-bold">Status:</td>
+                        <td>
+                            {% if file.status == 'uploaded' %}
+                                <span class="badge bg-secondary">Uploaded</span>
+                            {% elif file.status == 'processing' %}
+                                <span class="badge bg-warning text-dark">
+                                    <i class="fas fa-cog fa-spin me-1"></i>Processing
+                                </span>
+                            {% elif file.status == 'completed' %}
+                                <span class="badge bg-success">Completed</span>
+                            {% elif file.status == 'error' %}
+                                <span class="badge bg-danger">Error</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% if file.duration_seconds %}
+                    <tr>
+                        <td class="fw-bold">Duration:</td>
+                        <td>{{ file.duration_seconds }}</td>
+                    </tr>
+                    {% endif %}
+                    {% if file.speaker_count %}
+                    <tr>
+                        <td class="fw-bold">Speakers:</td>
+                        <td>{{ file.speaker_count }}</td>
+                    </tr>
+                    {% endif %}
+                </table>
+            </div>
+            <div class="card-footer">
+                {% if file.status == 'uploaded' %}
+                    <form method="POST" action="{{ url_for('files.start_transcription', file_id=file.id) }}">
+                        <button type="submit" class="btn btn-success w-100">
+                            <i class="fas fa-play me-1"></i> Start Transcription
+                        </button>
+                    </form>
+                {% elif file.status == 'completed' %}
+                    <a href="{{ url_for('transcripts.view_transcript', file_id=file.id) }}" class="btn btn-primary w-100">
+                        <i class="fas fa-file-alt me-1"></i> View Transcript
+                    </a>
+                {% elif file.status == 'processing' %}
+                    <button class="btn btn-warning w-100" disabled>
+                        <i class="fas fa-cog fa-spin me-1"></i> Processing...
+                    </button>
+                    <div class="text-center mt-2">
+                        <small class="text-muted">This may take a while for large files</small>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-8">
+        <div class="card mb-4 shadow-sm">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-tasks me-2"></i>Processing Pipeline
+                </h5>
+            </div>
+            <div class="card-body">
+                <ul class="list-group">
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <i class="fas fa-upload me-2"></i>
+                            <span class="fw-bold">File Upload</span>
+                            <div class="text-muted small">DCR file uploaded to storage</div>
+                        </div>
+                        <span class="badge bg-success rounded-pill">
+                            <i class="fas fa-check"></i>
+                        </span>
+                    </li>
+                    
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <i class="fas fa-volume-up me-2"></i>
+                            <span class="fw-bold">Audio Extraction</span>
+                            <div class="text-muted small">Extract audio from DCR file</div>
+                        </div>
+                        <span class="badge {% if file.audio_url %}bg-success{% elif file.status == 'processing' %}bg-warning{% else %}bg-secondary{% endif %} rounded-pill">
+                            {% if file.audio_url %}<i class="fas fa-check"></i>{% elif file.status == 'processing' %}<i class="fas fa-spinner fa-spin"></i>{% else %}<i class="fas fa-clock"></i>{% endif %}
+                        </span>
+                    </li>
+                    
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <i class="fas fa-microphone-alt me-2"></i>
+                            <span class="fw-bold">Speech Recognition</span>
+                            <div class="text-muted small">Convert speech to text</div>
+                        </div>
+                        <span class="badge {% if file.status == 'completed' %}bg-success{% elif file.status == 'processing' and file.audio_url %}bg-warning{% else %}bg-secondary{% endif %} rounded-pill">
+                            {% if file.status == 'completed' %}<i class="fas fa-check"></i>{% elif file.status == 'processing' and file.audio_url %}<i class="fas fa-spinner fa-spin"></i>{% else %}<i class="fas fa-clock"></i>{% endif %}
+                        </span>
+                    </li>
+                    
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <i class="fas fa-users me-2"></i>
+                            <span class="fw-bold">Speaker Diarization</span>
+                            <div class="text-muted small">Identify speakers in audio</div>
+                        </div>
+                        <span class="badge {% if file.diarization_url %}bg-success{% elif file.status == 'processing' and file.audio_url %}bg-warning{% else %}bg-secondary{% endif %} rounded-pill">
+                            {% if file.diarization_url %}<i class="fas fa-check"></i>{% elif file.status == 'processing' and file.audio_url %}<i class="fas fa-spinner fa-spin"></i>{% else %}<i class="fas fa-clock"></i>{% endif %}
+                        </span>
+                    </li>
+                    
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <i class="fas fa-file-alt me-2"></i>
+                            <span class="fw-bold">Final Transcript</span>
+                            <div class="text-muted small">Generate final transcript with speaker labels</div>
+                        </div>
+                        <span class="badge {% if file.transcript_url %}bg-success{% elif file.status == 'processing' and file.diarization_url %}bg-warning{% else %}bg-secondary{% endif %} rounded-pill">
+                            {% if file.transcript_url %}<i class="fas fa-check"></i>{% elif file.status == 'processing' and file.diarization_url %}<i class="fas fa-spinner fa-spin"></i>{% else %}<i class="fas fa-clock"></i>{% endif %}
+                        </span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+        
+        {% if file.status == 'error' and file.error_message %}
+        <div class="card mb-4 shadow-sm border-danger">
+            <div class="card-header bg-danger text-white">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-exclamation-triangle me-2"></i>Error
+                </h5>
+            </div>
+            <div class="card-body">
+                <p class="mb-0">{{ file.error_message }}</p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Auto-refresh the page if the file is processing
+document.addEventListener('DOMContentLoaded', function() {
+    if ('{{ file.status }}' === 'processing') {
+        setTimeout(function() {
+            window.location.reload();
+        }, 10000); // Refresh every 10 seconds
+    }
+});
+</script>
+{% endblock %} 
