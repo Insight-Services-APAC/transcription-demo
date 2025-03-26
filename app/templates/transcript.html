@@ -1,43 +1,57 @@
 {% extends "base.html" %}
 
-{% block title %}Transcript - {{ file.filename }} - Transcription App{% endblock %}
+{% block title %}Transcript - {{ file.filename }} - NSWCC Transcription Demo{% endblock %}
 
 {% block styles %}
 <style>
     .speaker-segment {
-        padding: 15px;
-        margin-bottom: 10px;
-        border-radius: 5px;
-        border-left: 5px solid #ccc;
+        padding: 18px;
+        margin-bottom: 16px;
+        border-radius: 12px;
+        position: relative;
+        transition: all 0.2s ease;
+        background-color: #f8f9fa;
     }
     
-    .speaker-1 { border-left-color: #007bff; }
-    .speaker-2 { border-left-color: #28a745; }
-    .speaker-3 { border-left-color: #dc3545; }
-    .speaker-4 { border-left-color: #fd7e14; }
-    .speaker-5 { border-left-color: #6f42c1; }
-    .speaker-6 { border-left-color: #e83e8c; }
+    .speaker-1 { border-left: 4px solid var(--primary-color); }
+    .speaker-2 { border-left: 4px solid #10b981; }
+    .speaker-3 { border-left: 4px solid #f59e0b; }
+    .speaker-4 { border-left: 4px solid #ef4444; }
+    .speaker-5 { border-left: 4px solid #8b5cf6; }
+    .speaker-6 { border-left: 4px solid #ec4899; }
     
     .timestamp {
-        color: #6c757d;
+        color: var(--gray-text);
         font-size: 0.8rem;
-        margin-right: 10px;
+        display: block;
+        margin-bottom: 6px;
     }
     
     .speaker-label {
-        font-weight: bold;
-        margin-right: 10px;
+        font-weight: 600;
+        display: inline-block;
+        margin-bottom: 8px;
+        padding: 4px 12px;
+        border-radius: 100px;
+        font-size: 0.85rem;
     }
     
-    .speaker-1 .speaker-label { color: #007bff; }
-    .speaker-2 .speaker-label { color: #28a745; }
-    .speaker-3 .speaker-label { color: #dc3545; }
-    .speaker-4 .speaker-label { color: #fd7e14; }
-    .speaker-5 .speaker-label { color: #6f42c1; }
-    .speaker-6 .speaker-label { color: #e83e8c; }
+    .speaker-1 .speaker-label { background-color: rgba(67, 97, 238, 0.1); color: var(--primary-color); }
+    .speaker-2 .speaker-label { background-color: rgba(16, 185, 129, 0.1); color: #10b981; }
+    .speaker-3 .speaker-label { background-color: rgba(245, 158, 11, 0.1); color: #f59e0b; }
+    .speaker-4 .speaker-label { background-color: rgba(239, 68, 68, 0.1); color: #ef4444; }
+    .speaker-5 .speaker-label { background-color: rgba(139, 92, 246, 0.1); color: #8b5cf6; }
+    .speaker-6 .speaker-label { background-color: rgba(236, 72, 153, 0.1); color: #ec4899; }
+    
+    .segment-text {
+        display: block;
+        line-height: 1.6;
+    }
     
     .active-segment {
-        background-color: #f8f9fa;
+        background-color: white;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        transform: translateY(-2px);
     }
     
     #audio-player {
@@ -45,85 +59,140 @@
         bottom: 0;
         left: 0;
         right: 0;
-        background-color: rgba(255, 255, 255, 0.9);
-        padding: 10px;
-        border-top: 1px solid #dee2e6;
+        background-color: rgba(255, 255, 255, 0.95);
+        padding: 16px;
+        border-top: 1px solid #e9ecef;
+        box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.05);
         z-index: 100;
+        backdrop-filter: blur(10px);
     }
     
     .transcript-section {
         max-height: calc(100vh - 250px);
         overflow-y: auto;
+        padding: 1.5rem;
+        background-color: white;
+        border-radius: 12px;
+    }
+    
+    .audio-progress {
+        height: 6px;
+        border-radius: 3px;
+        background-color: var(--primary-color);
+    }
+    
+    .audio-controls .btn {
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .btn-play-pause {
+        background-color: var(--primary-color);
+        color: white;
+        width: 48px !important;
+        height: 48px !important;
+    }
+    
+    .transcript-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 1.5rem;
+    }
+    
+    .btn-outline-light {
+        border-color: #e9ecef;
+        color: var(--gray-text);
+    }
+    
+    .btn-outline-light:hover {
+        background-color: #f8f9fa;
+        color: var(--dark-text);
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h1 class="mb-0">
-        <i class="fas fa-file-alt me-2"></i>Transcript
-    </h1>
+<div class="transcript-header">
+    <div class="d-flex align-items-center">
+        <a href="{{ url_for('files.file_detail', file_id=file.id) }}" class="btn btn-icon btn-light me-3">
+            <i class="fas fa-arrow-left"></i>
+        </a>
+        <div>
+            <h2 class="mb-0 fw-bold">{{ file.filename }}</h2>
+            <p class="text-muted mb-0 mt-1">
+                <span class="me-3">
+                    <i class="far fa-clock me-1"></i>
+                    {% if file.duration_seconds %}{{ file.duration_seconds }}{% else %}Unknown duration{% endif %}
+                </span>
+                {% if file.speaker_count %}
+                <span class="badge bg-info bg-opacity-10 text-info px-3 py-2">
+                    <i class="fas fa-users me-1"></i>{{ file.speaker_count }} speakers
+                </span>
+                {% endif %}
+            </p>
+        </div>
+    </div>
+    
     <div>
-        <a href="{{ url_for('files.file_detail', file_id=file.id) }}" class="btn btn-outline-primary me-2">
-            <i class="fas fa-info-circle me-1"></i> File Details
-        </a>
-        <a href="{{ url_for('files.file_list') }}" class="btn btn-outline-secondary">
-            <i class="fas fa-arrow-left me-1"></i> Back to Files
-        </a>
+        <div class="btn-group">
+            <a href="{{ file.audio_url }}" class="btn btn-outline-light" target="_blank" download>
+                <i class="fas fa-download me-2"></i> Audio
+            </a>
+            <a href="{{ file.transcript_url }}" class="btn btn-outline-light" target="_blank" download>
+                <i class="fas fa-download me-2"></i> JSON
+            </a>
+        </div>
     </div>
 </div>
 
-<div class="card shadow mb-4">
-    <div class="card-header bg-primary text-white">
-        <div class="d-flex justify-content-between align-items-center">
-            <h5 class="mb-0">{{ file.filename }}</h5>
-            <div>
-                <a href="{{ file.audio_url }}" class="btn btn-sm btn-light" target="_blank" download>
-                    <i class="fas fa-download me-1"></i> Download Audio
-                </a>
-                <a href="{{ file.transcript_url }}" class="btn btn-sm btn-light ms-2" target="_blank" download>
-                    <i class="fas fa-download me-1"></i> Download JSON
-                </a>
+<div class="card">
+    <div class="transcript-section" id="transcript-container">
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
             </div>
+            <p class="mt-2">Loading transcript...</p>
         </div>
     </div>
     
-    <div class="card-body p-0">
-        <div class="transcript-section p-3" id="transcript-container">
-            <div class="text-center py-5">
-                <div class="spinner-border text-primary" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
-                <p class="mt-2">Loading transcript...</p>
+    <div id="audio-player" class="p-3">
+        <div class="progress mb-3">
+            <div id="audio-progress-bar" class="progress-bar audio-progress" role="progressbar" style="width: 0%"></div>
+        </div>
+        
+        <div class="d-flex align-items-center">
+            <div id="current-time" class="me-2 text-muted small">0:00</div>
+            
+            <div class="audio-controls d-flex align-items-center mx-3">
+                <button id="btn-jump-back" class="btn btn-sm btn-outline-light me-2">
+                    <i class="fas fa-backward"></i>
+                </button>
+                <button id="btn-play-pause" class="btn btn-play-pause mx-2">
+                    <i class="fas fa-play"></i>
+                </button>
+                <button id="btn-jump-forward" class="btn btn-sm btn-outline-light ms-2">
+                    <i class="fas fa-forward"></i>
+                </button>
+            </div>
+            
+            <div class="ms-auto d-flex align-items-center">
+                <button id="btn-playback-speed" class="btn btn-sm btn-outline-light">
+                    1.0x
+                </button>
+                <span id="duration" class="ms-3 text-muted small">0:00</span>
             </div>
         </div>
-    </div>
-    
-    <div id="audio-player" class="card-footer">
-        <div class="row align-items-center">
-            <div class="col-md-6">
-                <audio id="audio-element" controls class="w-100">
-                    <source src="{{ file.audio_url }}" type="audio/wav">
-                    Your browser does not support the audio element.
-                </audio>
-            </div>
-            <div class="col-md-6">
-                <div class="btn-group w-100">
-                    <button id="btn-play-pause" class="btn btn-primary">
-                        <i class="fas fa-play"></i> Play
-                    </button>
-                    <button id="btn-jump-back" class="btn btn-secondary">
-                        <i class="fas fa-backward"></i> -10s
-                    </button>
-                    <button id="btn-jump-forward" class="btn btn-secondary">
-                        <i class="fas fa-forward"></i> +10s
-                    </button>
-                    <button id="btn-playback-speed" class="btn btn-info">
-                        1.0x
-                    </button>
-                </div>
-            </div>
-        </div>
+        
+        <audio id="audio-element" class="d-none">
+            <source src="{{ file.audio_url }}" type="audio/wav">
+            Your browser does not support the audio element.
+        </audio>
     </div>
 </div>
 {% endblock %}
@@ -137,11 +206,26 @@ document.addEventListener('DOMContentLoaded', function() {
     const btnJumpBack = document.getElementById('btn-jump-back');
     const btnJumpForward = document.getElementById('btn-jump-forward');
     const btnPlaybackSpeed = document.getElementById('btn-playback-speed');
+    const progressBar = document.getElementById('audio-progress-bar');
+    const currentTimeDisplay = document.getElementById('current-time');
+    const durationDisplay = document.getElementById('duration');
     
     let transcript = [];
     let currentSegment = null;
     const speedLevels = [0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
     let currentSpeedIndex = 1; // Start at 1.0x
+    
+    // Format time to MM:SS
+    function formatTime(seconds) {
+        const minutes = Math.floor(seconds / 60);
+        const remainingSeconds = Math.floor(seconds % 60);
+        return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+    }
+    
+    // Update duration once metadata is loaded
+    audioElement.addEventListener('loadedmetadata', function() {
+        durationDisplay.textContent = formatTime(audioElement.duration);
+    });
     
     // Fetch transcript data
     fetch('/api/transcript/{{ file.id }}')
@@ -186,11 +270,10 @@ document.addEventListener('DOMContentLoaded', function() {
         // Second pass: generate HTML
         transcript.forEach((segment, index) => {
             const speakerNum = speakerMap[segment.speaker] % 6 || 6; // Limit to 6 colors, cycling
-            const timeStr = `${segment.start} - ${segment.end}`;
             
             html += `
                 <div class="speaker-segment speaker-${speakerNum}" data-index="${index}" data-start="${timeToSeconds(segment.start)}" data-end="${timeToSeconds(segment.end)}">
-                    <span class="timestamp">${timeStr}</span>
+                    <span class="timestamp">${segment.start} - ${segment.end}</span>
                     <span class="speaker-label">${segment.speaker}</span>
                     <span class="segment-text">${segment.text}</span>
                 </div>
@@ -205,13 +288,40 @@ document.addEventListener('DOMContentLoaded', function() {
                 const startTime = parseFloat(this.dataset.start);
                 audioElement.currentTime = startTime;
                 audioElement.play();
+                btnPlayPause.innerHTML = '<i class="fas fa-pause"></i>';
             });
         });
+    }
+    
+    // Convert time format (e.g., "00:01:23.456") to seconds
+    function timeToSeconds(timeStr) {
+        const parts = timeStr.split(':');
+        let seconds = 0;
+        
+        if (parts.length === 3) {
+            // Format: HH:MM:SS.mmm
+            seconds += parseInt(parts[0]) * 3600; // Hours
+            seconds += parseInt(parts[1]) * 60;   // Minutes
+            seconds += parseFloat(parts[2]);      // Seconds with milliseconds
+        } else if (parts.length === 2) {
+            // Format: MM:SS.mmm
+            seconds += parseInt(parts[0]) * 60;   // Minutes
+            seconds += parseFloat(parts[1]);      // Seconds with milliseconds
+        }
+        
+        return seconds;
     }
     
     // Update active segment while playing
     audioElement.addEventListener('timeupdate', function() {
         const currentTime = audioElement.currentTime;
+        
+        // Update progress bar
+        const progress = (currentTime / audioElement.duration) * 100;
+        progressBar.style.width = `${progress}%`;
+        
+        // Update time display
+        currentTimeDisplay.textContent = formatTime(currentTime);
         
         // Find current segment
         const segments = document.querySelectorAll('.speaker-segment');
@@ -245,10 +355,10 @@ document.addEventListener('DOMContentLoaded', function() {
     btnPlayPause.addEventListener('click', function() {
         if (audioElement.paused) {
             audioElement.play();
-            btnPlayPause.innerHTML = '<i class="fas fa-pause"></i> Pause';
+            btnPlayPause.innerHTML = '<i class="fas fa-pause"></i>';
         } else {
             audioElement.pause();
-            btnPlayPause.innerHTML = '<i class="fas fa-play"></i> Play';
+            btnPlayPause.innerHTML = '<i class="fas fa-play"></i>';
         }
     });
     
@@ -262,28 +372,18 @@ document.addEventListener('DOMContentLoaded', function() {
         audioElement.currentTime = Math.min(audioElement.duration, audioElement.currentTime + 10);
     });
     
-    // Playback speed control
+    // Playback speed button
     btnPlaybackSpeed.addEventListener('click', function() {
         currentSpeedIndex = (currentSpeedIndex + 1) % speedLevels.length;
         const newSpeed = speedLevels[currentSpeedIndex];
         audioElement.playbackRate = newSpeed;
-        btnPlaybackSpeed.textContent = `${newSpeed.toFixed(2)}x`;
+        btnPlaybackSpeed.textContent = `${newSpeed}x`;
     });
     
-    // Update play/pause button when audio state changes
-    audioElement.addEventListener('play', function() {
-        btnPlayPause.innerHTML = '<i class="fas fa-pause"></i> Pause';
+    // When audio ends
+    audioElement.addEventListener('ended', function() {
+        btnPlayPause.innerHTML = '<i class="fas fa-play"></i>';
     });
-    
-    audioElement.addEventListener('pause', function() {
-        btnPlayPause.innerHTML = '<i class="fas fa-play"></i> Play';
-    });
-    
-    // Helper function to convert "HH:MM:SS" to seconds
-    function timeToSeconds(timeStr) {
-        const [hours, minutes, seconds] = timeStr.split(':').map(Number);
-        return hours * 3600 + minutes * 60 + seconds;
-    }
 });
 </script>
 {% endblock %}

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Transcription App{% endblock %}</title>
+    <title>{% block title %}NSWCC Transcription Demo{% endblock %}</title>
     
     <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -11,17 +11,84 @@
     <!-- Font Awesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        :root {
+            --primary-color: #4361ee;
+            --secondary-color: #3f37c9;
+            --accent-color: #4cc9f0;
+            --light-bg: #f8f9fa;
+            --dark-text: #212529;
+            --gray-text: #6c757d;
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: #f8fafb;
+            color: var(--dark-text);
+            line-height: 1.6;
+        }
+        
+        .navbar {
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            padding: 0.75rem 1rem;
+        }
+        
+        .navbar-brand {
+            font-weight: 600;
+            letter-spacing: -0.5px;
+        }
+        
+        .card {
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .card:hover {
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.08);
+        }
+        
+        .btn {
+            border-radius: 8px;
+            padding: 0.5rem 1.25rem;
+            font-weight: 500;
+            border: none;
+        }
+        
+        .btn-primary {
+            background-color: var(--primary-color);
+        }
+        
+        .btn-primary:hover {
+            background-color: var(--secondary-color);
+        }
+        
+        .alert {
+            border: none;
+            border-radius: 8px;
+        }
+        
+        footer {
+            font-size: 0.9rem;
+            opacity: 0.75;
+        }
+    </style>
     
     {% block styles %}{% endblock %}
 </head>
 <body>
     <!-- Navigation -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <nav class="navbar navbar-expand-lg navbar-light bg-white">
         <div class="container">
-            <a class="navbar-brand" href="{{ url_for('main.index') }}">
-                <i class="fas fa-microphone-alt me-2"></i>Transcription App
+            <a class="navbar-brand d-flex align-items-center" href="{{ url_for('main.index') }}">
+                <i class="fas fa-waveform me-2 text-primary"></i>NSWCC Transcription Demo
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
@@ -29,13 +96,13 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
                     <li class="nav-item">
-                        <a class="nav-link {% if request.path == url_for('files.upload') %}active{% endif %}" 
+                        <a class="nav-link {% if request.path == url_for('files.upload') %}active fw-medium{% endif %}" 
                            href="{{ url_for('files.upload') }}">
                             <i class="fas fa-upload me-1"></i> Upload
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if request.path == url_for('files.file_list') %}active{% endif %}" 
+                        <a class="nav-link {% if request.path == url_for('files.file_list') %}active fw-medium{% endif %}" 
                            href="{{ url_for('files.file_list') }}">
                             <i class="fas fa-list me-1"></i> Files
                         </a>
@@ -65,17 +132,14 @@
     </main>
     
     <!-- Footer -->
-    <footer class="bg-dark text-light py-3 mt-5">
-        <div class="container text-center">
-            <p class="mb-0">&copy; 2023 Transcription App</p>
+    <footer class="bg-white py-4 mt-5 border-top">
+        <div class="container text-center text-muted">
+            <p class="mb-0">© 2025 NSWCC Transcription Demo</p>
         </div>
     </footer>
     
     <!-- Bootstrap Bundle with Popper -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
-    
-    <!-- Custom JavaScript -->
-    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
     
     {% block scripts %}{% endblock %}
 </body>
