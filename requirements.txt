@@ -10,6 +10,7 @@ azure-cognitiveservices-speech==1.30.0
 azure-core==1.32.0
 azure-identity==1.14.1
 azure-storage-blob==12.18.3
+beautifulsoup4==4.12.2
 billiard==4.2.1
 blinker==1.9.0
 celery==5.3.4
@@ -100,9 +101,9 @@ pydub==0.25.1
 Pygments==2.19.1
 PyJWT==2.10.1
 pyparsing==3.2.3
-pytest==8.3.5
-pytest-cov==6.0.0
-pytest-mock==3.14.0
+pytest==7.4.2
+pytest-cov==4.1.0
+pytest-mock==3.12.0
 python-dateutil==2.9.0.post0
 python-dotenv==1.0.0
 pytorch-lightning==2.5.1
@@ -124,6 +125,7 @@ shellingham==1.5.4
 six==1.17.0
 sortedcontainers==2.4.0
 soundfile==0.13.1
+soupsieve==2.6
 speechbrain==1.0.2
 SQLAlchemy==2.0.23
 sympy==1.13.1
