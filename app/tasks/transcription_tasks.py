@@ -15,6 +15,7 @@ from app.services.transcript_stitcher import TranscriptStitcher
 from app.services.blob_storage import BlobStorageService
 import shutil
 from flask import current_app
+from sqlalchemy.orm import scoped_session, sessionmaker
 
 # Configure logging
 logging.basicConfig(
@@ -28,6 +29,19 @@ logging.basicConfig(
 logger = logging.getLogger('transcription_tasks')
 
 # Initialize services
+
+
+def get_db_session():
+    """Get a fresh database session for the task context"""
+    from app.models import db_session, engine
+
+    # Check if db_session is None or closed
+    if db_session is None or not hasattr(db_session, 'is_active') or not db_session.is_active:
+        # Create a new scoped session
+        from sqlalchemy.orm import scoped_session, sessionmaker
+        return scoped_session(sessionmaker(autocommit=False, autoflush=False, bind=engine))
+
+    return db_session
 
 
 def get_blob_service():
@@ -71,7 +85,10 @@ def update_progress(file_id, stage, stage_progress, overall_progress=None):
     logger.debug(
         f"Updating progress for file {file_id}: stage={stage}, progress={stage_progress}%, overall={overall_progress}%")
     try:
-        file = db_session.query(File).filter(File.id == file_id).first()
+        # Get a fresh session
+        session = get_db_session()
+
+        file = session.query(File).filter(File.id == file_id).first()
 
         if file:
             file.current_stage = stage
@@ -80,7 +97,7 @@ def update_progress(file_id, stage, stage_progress, overall_progress=None):
             if overall_progress is not None:
                 file.progress_percent = overall_progress
 
-            db_session.commit()
+            session.commit()
             logger.debug(f"Progress updated successfully for file {file_id}")
         else:
             logger.warning(
@@ -98,9 +115,13 @@ def transcribe_file(file_id):
     logger.info(f"=== Starting transcription pipeline for file {file_id} ===")
     start_time = time.time()
 
+    # Get a fresh database session
+    session = get_db_session()
+
     # Update file status to processing
     try:
-        file = db_session.query(File).filter(File.id == file_id).first()
+        # Use the fresh session instead of the global db_session
+        file = session.query(File).filter(File.id == file_id).first()
 
         if not file:
             logger.error(f"File with ID {file_id} not found")
@@ -110,7 +131,7 @@ def transcribe_file(file_id):
         file.status = "processing"
         file.current_stage = "queued"
         file.progress_percent = 0
-        db_session.commit()
+        session.commit()
         logger.info(f"Updated file status to 'processing'")
 
         try:
@@ -138,7 +159,7 @@ def transcribe_file(file_id):
             logger.error(traceback.format_exc())
             file.status = "error"
             file.error_message = str(e)
-            db_session.commit()
+            session.commit()
             logger.error(f"Updated file status to 'error': {str(e)}")
             return {"status": "error", "message": str(e)}
     except Exception as e:
@@ -156,9 +177,10 @@ def extract_audio(file_id):
     # Update progress
     update_progress(file_id, "extract_audio", 0, 5)
 
-    # Get file from database
+    # Get file from database using fresh session
+    session = get_db_session()
     try:
-        file = db_session.query(File).filter(File.id == file_id).first()
+        file = session.query(File).filter(File.id == file_id).first()
 
         if not file:
             logger.error(f"File with ID {file_id} not found")
@@ -229,7 +251,7 @@ def extract_audio(file_id):
             # Update file in database
             logger.info(f"Updating file record with audio URL: {audio_url}")
             file.audio_url = audio_url
-            db_session.commit()
+            session.commit()
 
             # Update progress
             update_progress(file_id, "extract_audio", 100, 20)
@@ -256,7 +278,7 @@ def extract_audio(file_id):
             # Update file status
             file.status = "error"
             file.error_message = f"Error extracting audio: {str(e)}"
-            db_session.commit()
+            session.commit()
             logger.error(f"Updated file status to 'error'")
 
             raise Exception(f"Error extracting audio: {str(e)}")
@@ -280,10 +302,11 @@ def chunk_audio(previous_result):
     logger.info(f"Temp directory: {temp_dir}")
 
     try:
-        # Get file from database for progress updates
+        # Get file from database for progress updates using fresh session
+        session = get_db_session()
         file = None
         if file_id:
-            file = db_session.query(File).filter(File.id == file_id).first()
+            file = session.query(File).filter(File.id == file_id).first()
             if file:
                 logger.info(f"Found file record: {file.filename}")
             else:
@@ -311,11 +334,11 @@ def chunk_audio(previous_result):
             logger.debug(
                 f"Chunk {i+1}/{num_chunks}: {path} - Size: {chunk_size/1024:.2f} KB")
 
-        # Update progress and store chunk count
+        # Update progress and store chunk count using fresh session
         if file_id and file:
             file.chunk_count = num_chunks
             file.chunks_processed = 0
-            db_session.commit()
+            session.commit()
             logger.info(f"Updated file record with chunk count: {num_chunks}")
             update_progress(file_id, "chunk_audio", 100, 30)
 
@@ -338,12 +361,13 @@ def chunk_audio(previous_result):
         logger.info(f"Cleaned up temporary directory: {temp_dir}")
 
         # Update file status if we have file_id
+        session = get_db_session()
         if file_id:
-            file = db_session.query(File).filter(File.id == file_id).first()
+            file = session.query(File).filter(File.id == file_id).first()
             if file:
                 file.status = "error"
                 file.error_message = f"Error chunking audio: {str(e)}"
-                db_session.commit()
+                session.commit()
                 logger.error(f"Updated file status to 'error'")
 
         raise Exception(f"Error chunking audio: {str(e)}")
@@ -362,8 +386,9 @@ def transcribe_chunks(previous_result, file_id):
     logger.info(f"Temp directory: {temp_dir}")
 
     try:
-        # Get file for progress tracking
-        file = db_session.query(File).filter(File.id == file_id).first()
+        # Get file for progress tracking using fresh session
+        session = get_db_session()
+        file = session.query(File).filter(File.id == file_id).first()
         if not file:
             logger.error(f"File with ID {file_id} not found")
             raise Exception(f"File with ID {file_id} not found")
@@ -381,7 +406,7 @@ def transcribe_chunks(previous_result, file_id):
         chunk_transcripts = []
         total_chunks = len(chunk_paths)
         file.chunk_count = total_chunks
-        db_session.commit()
+        session.commit()
         logger.info(f"Updated file record with total chunks: {total_chunks}")
 
         for i, chunk_path in enumerate(chunk_paths):
@@ -410,7 +435,12 @@ def transcribe_chunks(previous_result, file_id):
                 chunk_transcripts.append("")
 
             # Update progress
-            file.chunks_processed = i + 1
+            session = get_db_session()
+            file = session.query(File).filter(File.id == file_id).first()
+            if file:
+                file.chunks_processed = i + 1
+                session.commit()
+
             progress_pct = ((i + 1) / total_chunks) * 100
             overall_progress = 35 + ((i + 1) / total_chunks) * 25  # 35% to 60%
             update_progress(file_id, "transcribe_chunks",
@@ -447,7 +477,8 @@ def transcribe_chunks(previous_result, file_id):
         return {
             **previous_result,
             "transcript_paths": transcript_paths,
-            "transcripts_dir": transcripts_dir
+            "transcripts_dir": transcripts_dir,
+            "chunk_transcripts": chunk_transcripts
         }
 
     except Exception as e:
@@ -457,12 +488,13 @@ def transcribe_chunks(previous_result, file_id):
         shutil.rmtree(temp_dir, ignore_errors=True)
         logger.info(f"Cleaned up temporary directory: {temp_dir}")
 
-        # Update file status
-        file = db_session.query(File).filter(File.id == file_id).first()
+        # Update file status using fresh session
+        session = get_db_session()
+        file = session.query(File).filter(File.id == file_id).first()
         if file:
             file.status = "error"
             file.error_message = f"Error transcribing chunks: {str(e)}"
-            db_session.commit()
+            session.commit()
             logger.error(f"Updated file status to 'error'")
 
         raise Exception(f"Error transcribing chunks: {str(e)}")
@@ -501,7 +533,10 @@ def perform_diarization(previous_result, file_id):
 
         # Upload diarization results to blob storage
         blob_service = get_blob_service()
-        file = db_session.query(File).filter(File.id == file_id).first()
+
+        # Get fresh database session
+        session = get_db_session()
+        file = session.query(File).filter(File.id == file_id).first()
 
         diarization_blob_path = os.path.splitext(os.path.basename(file.filename))[
             0] + '/diarization/diarization.json'
@@ -512,7 +547,7 @@ def perform_diarization(previous_result, file_id):
         file.diarization_url = diarization_url
         file.speaker_count = str(
             len(set(segment['speaker'] for segment in diarization_segments)))
-        db_session.commit()
+        session.commit()
 
         # Update progress - upload complete
         update_progress(file_id, "diarization", 100, 80)
@@ -529,12 +564,13 @@ def perform_diarization(previous_result, file_id):
         # Clean up temp directory
         shutil.rmtree(temp_dir, ignore_errors=True)
 
-        # Update file status
-        file = db_session.query(File).filter(File.id == file_id).first()
+        # Update file status using fresh session
+        session = get_db_session()
+        file = session.query(File).filter(File.id == file_id).first()
         if file:
             file.status = "error"
             file.error_message = f"Error performing diarization: {str(e)}"
-            db_session.commit()
+            session.commit()
 
         raise Exception(f"Error performing diarization: {str(e)}")
 
@@ -542,9 +578,9 @@ def perform_diarization(previous_result, file_id):
 @shared_task
 def stitch_transcript(previous_result, file_id):
     """Stitch together the transcripts and apply diarization"""
-    chunk_transcripts = previous_result["chunk_transcripts"]
-    diarization_segments = previous_result["diarization_segments"]
-    temp_dir = previous_result["temp_dir"]
+    chunk_transcripts = previous_result.get("chunk_transcripts")
+    diarization_segments = previous_result.get("diarization_segments")
+    temp_dir = previous_result.get("temp_dir")
 
     try:
         # Update progress
@@ -578,7 +614,10 @@ def stitch_transcript(previous_result, file_id):
 
         # Upload final transcript to blob storage
         blob_service = get_blob_service()
-        file = db_session.query(File).filter(File.id == file_id).first()
+
+        # Get fresh database session
+        session = get_db_session()
+        file = session.query(File).filter(File.id == file_id).first()
 
         json_blob_path = os.path.splitext(os.path.basename(file.filename))[
             0] + '/transcript/final.json'
@@ -592,7 +631,7 @@ def stitch_transcript(previous_result, file_id):
         file.transcript_url = json_url
         file.status = "completed"
         file.progress_percent = 100
-        db_session.commit()
+        session.commit()
 
         # Clean up temp directory
         shutil.rmtree(temp_dir, ignore_errors=True)
@@ -609,11 +648,12 @@ def stitch_transcript(previous_result, file_id):
         # Clean up temp directory
         shutil.rmtree(temp_dir, ignore_errors=True)
 
-        # Update file status
-        file = db_session.query(File).filter(File.id == file_id).first()
+        # Update file status using fresh session
+        session = get_db_session()
+        file = session.query(File).filter(File.id == file_id).first()
         if file:
             file.status = "error"
             file.error_message = f"Error stitching transcript: {str(e)}"
-            db_session.commit()
+            session.commit()
 
         raise Exception(f"Error stitching transcript: {str(e)}")
