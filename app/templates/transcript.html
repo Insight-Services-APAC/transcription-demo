@@ -114,6 +114,47 @@
         background-color: #f8f9fa;
         color: var(--dark-text);
     }
+    
+    .word-highlight {
+        display: inline-block;
+        position: relative;
+        cursor: pointer;
+    }
+    
+    .word-highlight.low-confidence {
+        background-color: rgba(239, 68, 68, 0.1);
+        padding: 0 2px;
+        border-radius: 2px;
+    }
+    
+    .word-highlight.medium-confidence {
+        background-color: rgba(245, 158, 11, 0.1);
+        padding: 0 2px;
+        border-radius: 2px;
+    }
+    
+    .word-highlight.high-confidence {
+        /* No special styling for high confidence words */
+    }
+    
+    .word-tooltip {
+        position: absolute;
+        bottom: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        background-color: #333;
+        color: white;
+        font-size: 0.75rem;
+        padding: 4px 8px;
+        border-radius: 4px;
+        white-space: nowrap;
+        display: none;
+        z-index: 100;
+    }
+    
+    .word-highlight:hover .word-tooltip {
+        display: block;
+    }
 </style>
 {% endblock %}
 
@@ -141,7 +182,7 @@
     
     <div>
         <div class="btn-group">
-            <a href="{{ file.audio_url }}" class="btn btn-outline-light" target="_blank" download>
+            <a href="{{ file.blob_url }}" class="btn btn-outline-light" target="_blank" download>
                 <i class="fas fa-download me-2"></i> Audio
             </a>
             <a href="{{ file.transcript_url }}" class="btn btn-outline-light" target="_blank" download>
@@ -190,7 +231,7 @@
         </div>
         
         <audio id="audio-element" class="d-none">
-            <source src="{{ file.audio_url }}" type="audio/wav">
+            <source src="{{ file.blob_url }}" type="audio/wav">
             Your browser does not support the audio element.
         </audio>
     </div>
@@ -211,6 +252,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const durationDisplay = document.getElementById('duration');
     
     let transcript = [];
+    let segments = [];
     let currentSegment = null;
     const speedLevels = [0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
     let currentSpeedIndex = 1; // Start at 1.0x
@@ -237,6 +279,7 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .then(data => {
             transcript = data;
+            segments = data.segments;
             renderTranscript();
         })
         .catch(error => {
@@ -250,7 +293,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Render transcript
     function renderTranscript() {
-        if (!transcript || transcript.length === 0) {
+        if (!segments || segments.length === 0) {
             transcriptContainer.innerHTML = '<div class="alert alert-warning">No transcript data found.</div>';
             return;
         }
@@ -260,22 +303,35 @@ document.addEventListener('DOMContentLoaded', function() {
         let speakerCount = 0;
         
         // First pass: assign consistent speaker numbers
-        transcript.forEach(segment => {
-            if (!speakerMap[segment.speaker]) {
+        segments.forEach(segment => {
+            if (segment.speaker !== undefined && !speakerMap[segment.speaker]) {
                 speakerCount++;
                 speakerMap[segment.speaker] = speakerCount;
             }
         });
         
+        // If no speakers were detected, default to one speaker
+        if (speakerCount === 0) {
+            speakerMap[0] = 1;
+        }
+        
         // Second pass: generate HTML
-        transcript.forEach((segment, index) => {
-            const speakerNum = speakerMap[segment.speaker] % 6 || 6; // Limit to 6 colors, cycling
+        segments.forEach((segment, index) => {
+            const speakerNum = (segment.speaker !== undefined ? speakerMap[segment.speaker] : 1) % 6 || 6; // Limit to 6 colors, cycling
+            
+            // Process words with confidence
+            let processedText = segment.text;
+            
+            // If segment has words with confidence, create highlighted spans
+            if (segment.words && segment.words.length > 0) {
+                processedText = createHighlightedText(segment.words, segment.text);
+            }
             
             html += `
-                <div class="speaker-segment speaker-${speakerNum}" data-index="${index}" data-start="${timeToSeconds(segment.start)}" data-end="${timeToSeconds(segment.end)}">
+                <div class="speaker-segment speaker-${speakerNum}" data-index="${index}" data-start="${segment.offsetMilliseconds / 1000}" data-end="${(segment.offsetMilliseconds + segment.durationMilliseconds) / 1000}">
                     <span class="timestamp">${segment.start} - ${segment.end}</span>
-                    <span class="speaker-label">${segment.speaker}</span>
-                    <span class="segment-text">${segment.text}</span>
+                    <span class="speaker-label">Speaker ${segment.speaker !== undefined ? segment.speaker + 1 : 1}</span>
+                    <span class="segment-text">${processedText}</span>
                 </div>
             `;
         });
@@ -293,7 +349,32 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Convert time format (e.g., "00:01:23.456") to seconds
+    // Create word-by-word highlighted text based on confidence
+    function createHighlightedText(words, originalText) {
+        // This is a simplified approach - for a production app, 
+        // you'd need more sophisticated text alignment logic
+        
+        let highlightedText = '';
+        
+        words.forEach(word => {
+            let confidenceClass = 'high-confidence';
+            
+            if (word.confidence < 0.5) {
+                confidenceClass = 'low-confidence';
+            } else if (word.confidence < 0.8) {
+                confidenceClass = 'medium-confidence';
+            }
+            
+            highlightedText += `<span class="word-highlight ${confidenceClass}" data-start="${word.offsetMilliseconds / 1000}" data-end="${(word.offsetMilliseconds + word.durationMilliseconds) / 1000}">
+                ${word.word}
+                <span class="word-tooltip">Confidence: ${Math.round(word.confidence * 100)}%</span>
+            </span> `;
+        });
+        
+        return highlightedText;
+    }
+    
+    // Convert time format (HH:MM:SS) to seconds
     function timeToSeconds(timeStr) {
         const parts = timeStr.split(':');
         let seconds = 0;
@@ -324,10 +405,10 @@ document.addEventListener('DOMContentLoaded', function() {
         currentTimeDisplay.textContent = formatTime(currentTime);
         
         // Find current segment
-        const segments = document.querySelectorAll('.speaker-segment');
+        const segmentElements = document.querySelectorAll('.speaker-segment');
         let activeSegment = null;
         
-        segments.forEach(segment => {
+        segmentElements.forEach(segment => {
             const start = parseFloat(segment.dataset.start);
             const end = parseFloat(segment.dataset.end);
             
@@ -339,6 +420,25 @@ document.addEventListener('DOMContentLoaded', function() {
             segment.classList.remove('active-segment');
         });
         
+        // Find active word
+        document.querySelectorAll('.word-highlight').forEach(wordSpan => {
+            wordSpan.style.backgroundColor = '';
+            
+            const wordStart = parseFloat(wordSpan.dataset.start);
+            const wordEnd = parseFloat(wordSpan.dataset.end);
+            
+            if (currentTime >= wordStart && currentTime <= wordEnd) {
+                // Highlight current word
+                if (wordSpan.classList.contains('low-confidence')) {
+                    wordSpan.style.backgroundColor = 'rgba(239, 68, 68, 0.3)';
+                } else if (wordSpan.classList.contains('medium-confidence')) {
+                    wordSpan.style.backgroundColor = 'rgba(245, 158, 11, 0.3)';  
+                } else {
+                    wordSpan.style.backgroundColor = 'rgba(67, 97, 238, 0.2)';
+                }
+            }
+        });
+        
         // Add active class to current segment
         if (activeSegment) {
             activeSegment.classList.add('active-segment');
@@ -348,6 +448,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 currentSegment = activeSegment;
                 activeSegment.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
+        }
+    });
+    
+    // Make words clickable to jump to their timestamp
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('word-highlight') || e.target.closest('.word-highlight')) {
+            const wordSpan = e.target.classList.contains('word-highlight') ? e.target : e.target.closest('.word-highlight');
+            const startTime = parseFloat(wordSpan.dataset.start);
+            
+            audioElement.currentTime = startTime;
+            audioElement.play();
+            btnPlayPause.innerHTML = '<i class="fas fa-pause"></i>';
         }
     });
     
@@ -383,6 +495,33 @@ document.addEventListener('DOMContentLoaded', function() {
     // When audio ends
     audioElement.addEventListener('ended', function() {
         btnPlayPause.innerHTML = '<i class="fas fa-play"></i>';
+    });
+    
+    // Handle keyboard shortcuts
+    document.addEventListener('keydown', function(e) {
+        // Space - play/pause
+        if (e.code === 'Space' && !e.target.matches('input, textarea, button, select')) {
+            e.preventDefault();
+            if (audioElement.paused) {
+                audioElement.play();
+                btnPlayPause.innerHTML = '<i class="fas fa-pause"></i>';
+            } else {
+                audioElement.pause();
+                btnPlayPause.innerHTML = '<i class="fas fa-play"></i>';
+            }
+        }
+        
+        // Left arrow - jump back
+        if (e.code === 'ArrowLeft' && !e.target.matches('input, textarea, button, select')) {
+            e.preventDefault();
+            audioElement.currentTime = Math.max(0, audioElement.currentTime - 5);
+        }
+        
+        // Right arrow - jump forward
+        if (e.code === 'ArrowRight' && !e.target.matches('input, textarea, button, select')) {
+            e.preventDefault();
+            audioElement.currentTime = Math.min(audioElement.duration, audioElement.currentTime + 5);
+        }
     });
 });
 </script>

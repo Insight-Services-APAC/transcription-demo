@@ -15,21 +15,20 @@ class File(Base):
     error_message = Column(Text, nullable=True)
     
     # Progress tracking
-    current_stage = Column(String(50), nullable=True)  # extract_audio, chunk_audio, transcribe, diarize, stitch
+    current_stage = Column(String(50), nullable=True)  # transcribing
     progress_percent = Column(Float, default=0.0)  # Overall progress percentage
     stage_progress = Column(Float, default=0.0)  # Progress of current stage
     
     # Storage URLs
     blob_url = Column(String(512), nullable=True)
-    audio_url = Column(String(512), nullable=True)
     transcript_url = Column(String(512), nullable=True)
-    diarization_url = Column(String(512), nullable=True)
+    
+    # Azure Speech Service transcription ID
+    transcription_id = Column(String(255), nullable=True)
     
     # Processing metadata
     duration_seconds = Column(String(50), nullable=True)
     speaker_count = Column(String(10), nullable=True)
-    chunk_count = Column(Integer, nullable=True)
-    chunks_processed = Column(Integer, default=0)
     
     def __repr__(self):
         return f"<File(id='{self.id}', filename='{self.filename}', status='{self.status}')>"
@@ -45,11 +44,8 @@ class File(Base):
             'progress_percent': self.progress_percent,
             'stage_progress': self.stage_progress,
             'blob_url': self.blob_url,
-            'audio_url': self.audio_url,
             'transcript_url': self.transcript_url,
-            'diarization_url': self.diarization_url,
+            'transcription_id': self.transcription_id,
             'duration_seconds': self.duration_seconds,
-            'speaker_count': self.speaker_count,
-            'chunk_count': self.chunk_count,
-            'chunks_processed': self.chunks_processed
+            'speaker_count': self.speaker_count
         }

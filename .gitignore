@@ -58,7 +58,6 @@ celerybeat.pid
 # Digest files
 digest.txt
 **/digest.txt
-**/ingest.sh
 
 .pytest_cache/
 

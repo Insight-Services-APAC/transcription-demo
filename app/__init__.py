@@ -30,4 +30,4 @@ def create_app(config_name='default'):
     # Initialize Celery
     app.celery = make_celery(app)
     
-    return app 
+    return app

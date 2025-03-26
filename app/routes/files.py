@@ -18,7 +18,7 @@ local_uploads = {}
 
 @files_bp.route('/upload', methods=['GET', 'POST'])
 def upload():
-    """Upload page for DCR files"""
+    """Upload page for audio files"""
     if request.method == 'POST':
         # Check if a file was uploaded
         if 'file' not in request.files:
@@ -33,8 +33,8 @@ def upload():
             return redirect(request.url)
 
         # Check file extension
-        if not file.filename.lower().endswith('.dcr'):
-            flash('Only .DCR files are allowed', 'danger')
+        if not file.filename.lower().endswith(('.mp3', '.wav')):
+            flash('Only .MP3 and .WAV files are allowed', 'danger')
             return redirect(request.url)
 
         # Create secure filename
@@ -70,7 +70,7 @@ def upload():
                 container_name=current_app.config['AZURE_STORAGE_CONTAINER']
             )
 
-            blob_url = blob_service.upload_file(tmp_path, filename)
+            blob_url = blob_service.upload_file(tmp_path, filename, upload_id=None)
 
             # Create file record in database
             file_record = File(
@@ -118,8 +118,8 @@ def start_upload():
             return jsonify({'error': 'No file selected'})
 
         # Check file extension
-        if not file.filename.lower().endswith('.dcr'):
-            return jsonify({'error': 'Only .DCR files are allowed'})
+        if not file.filename.lower().endswith(('.mp3', '.wav')):
+            return jsonify({'error': 'Only .MP3 and .WAV files are allowed'})
 
         # Create secure filename
         filename = secure_filename(file.filename)

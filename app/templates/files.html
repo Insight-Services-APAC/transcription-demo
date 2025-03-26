@@ -57,16 +57,8 @@
                                     <div class="d-flex flex-column">
                                         <div class="d-flex justify-content-between mb-1">
                                             <small class="text-muted current-stage">
-                                                {% if file.current_stage == 'extract_audio' %}
-                                                    Extracting Audio
-                                                {% elif file.current_stage == 'chunk_audio' %}
-                                                    Chunking Audio
-                                                {% elif file.current_stage == 'transcribe_chunks' %}
-                                                    Transcribing ({{ file.chunks_processed or 0 }}/{{ file.chunk_count or '?' }})
-                                                {% elif file.current_stage == 'diarization' %}
-                                                    Identifying Speakers
-                                                {% elif file.current_stage == 'stitch_transcript' %}
-                                                    Generating Transcript
+                                                {% if file.current_stage == 'transcribing' %}
+                                                    Transcribing Audio
                                                 {% elif file.current_stage == 'queued' %}
                                                     Queued for Processing
                                                 {% else %}
@@ -134,7 +126,7 @@
                     <i class="fas fa-file-upload fa-3x text-primary"></i>
                 </div>
                 <h3 class="fw-bold">No files yet</h3>
-                <p class="text-muted mb-4">Upload a DCR file to get started with transcription</p>
+                <p class="text-muted mb-4">Upload an audio file to get started with transcription</p>
                 <a href="{{ url_for('files.upload') }}" class="btn btn-primary px-4 py-2">
                     <i class="fas fa-plus me-2"></i> Upload File
                 </a>
@@ -210,16 +202,8 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Update current stage text
         if (currentStage) {
-            if (file.current_stage === 'extract_audio') {
-                currentStage.textContent = 'Extracting Audio';
-            } else if (file.current_stage === 'chunk_audio') {
-                currentStage.textContent = 'Chunking Audio';
-            } else if (file.current_stage === 'transcribe_chunks') {
-                currentStage.textContent = `Transcribing (${file.chunks_processed || 0}/${file.chunk_count || '?'})`;
-            } else if (file.current_stage === 'diarization') {
-                currentStage.textContent = 'Identifying Speakers';
-            } else if (file.current_stage === 'stitch_transcript') {
-                currentStage.textContent = 'Generating Transcript';
+            if (file.current_stage === 'transcribing') {
+                currentStage.textContent = 'Transcribing Audio';
             } else if (file.current_stage === 'queued') {
                 currentStage.textContent = 'Queued for Processing';
             } else {

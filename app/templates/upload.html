@@ -1,26 +1,26 @@
 {% extends "base.html" %}
 
-{% block title %}Upload DCR File - NSWCC Transcription Demo{% endblock %}
+{% block title %}Upload Audio File - NSWCC Transcription Demo{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
     <div class="col-lg-8">
         <div class="card">
             <div class="card-body p-4">
-                <h2 class="card-title fw-bold mb-4">Upload DCR File</h2>
+                <h2 class="card-title fw-bold mb-4">Upload Audio File</h2>
                 
                 <div class="alert alert-light border-start border-4 border-primary mb-4">
-                    <p class="mb-0">Upload a .DCR file (up to 5GB) for transcription and speaker diarization.</p>
+                    <p class="mb-0">Upload a .MP3 or .WAV file (up to 5GB) for transcription and speaker diarization.</p>
                 </div>
                 
                 <form method="POST" enctype="multipart/form-data" id="uploadForm">
                     <div class="mb-4">
                         <div class="form-file-container p-4 rounded border border-2 border-dashed text-center position-relative">
                             <input class="form-control position-absolute opacity-0 top-0 start-0 w-100 h-100" 
-                                   id="file" name="file" type="file" accept=".dcr" required>
+                                   id="file" name="file" type="file" accept=".mp3,.wav" required>
                             <div class="py-5" id="dropAreaContent">
                                 <i class="fas fa-cloud-upload-alt fa-3x text-primary mb-3"></i>
-                                <h5>Drop your DCR file here</h5>
+                                <h5>Drop your audio file here</h5>
                                 <p class="text-muted mb-0">or click to browse</p>
                             </div>
                             <div class="py-5 d-none" id="fileSelectedContent">
@@ -30,7 +30,7 @@
                                 <p class="text-muted file-size mt-2" id="selectedFileSize"></p>
                             </div>
                         </div>
-                        <div class="form-text mt-2">Only .DCR format files are accepted.</div>
+                        <div class="form-text mt-2">Only .MP3 and .WAV format files are accepted.</div>
                     </div>
                     
                     <!-- Progress bar (hidden initially) -->
@@ -126,9 +126,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Update UI when file is selected
     fileInput.addEventListener('change', function() {
-        if (fileInput.files.length > 0) {
-            const fileName = fileInput.files[0].name;
-            const fileSize = fileInput.files[0].size;
+        if (this.files.length > 0) {
+            const fileName = this.files[0].name;
+            const fileSize = this.files[0].size;
             
             selectedFileName.textContent = fileName;
             selectedFileSize.textContent = `File size: ${formatFileSize(fileSize)}`;

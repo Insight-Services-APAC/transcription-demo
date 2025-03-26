@@ -62,13 +62,6 @@
                     <span class="badge bg-info bg-opacity-10 text-info px-3 py-2">{{ file.speaker_count }}</span>
                 </div>
                 {% endif %}
-
-                {% if file.chunk_count %}
-                <div class="d-flex justify-content-between mb-3">
-                    <span class="text-muted">Audio Chunks</span>
-                    <span class="badge bg-primary bg-opacity-10 text-primary px-3 py-2">{{ file.chunk_count }}</span>
-                </div>
-                {% endif %}
                 
                 {% if file.status == 'processing' %}
                 <div class="mt-4">
@@ -78,16 +71,8 @@
                     </div>
                     <div class="d-flex justify-content-between">
                         <span class="text-muted small">
-                            {% if file.current_stage == 'extract_audio' %}
-                                Extracting Audio
-                            {% elif file.current_stage == 'chunk_audio' %}
-                                Chunking Audio
-                            {% elif file.current_stage == 'transcribe_chunks' %}
-                                Transcribing ({{ file.chunks_processed or 0 }}/{{ file.chunk_count or '?' }})
-                            {% elif file.current_stage == 'diarization' %}
-                                Identifying Speakers
-                            {% elif file.current_stage == 'stitch_transcript' %}
-                                Generating Transcript
+                            {% if file.current_stage == 'transcribing' %}
+                                Transcribing Audio
                             {% elif file.current_stage == 'queued' %}
                                 Queued for Processing
                             {% else %}
@@ -124,7 +109,7 @@
                         </div>
                         <div class="timeline-content">
                             <h6 class="fw-bold">File Upload</h6>
-                            <p class="text-muted mb-0 small">DCR file uploaded to storage</p>
+                            <p class="text-muted mb-0 small">Audio file uploaded to storage</p>
                             {% if file.progress_percent > 0 %}
                             <div class="progress mt-2" style="height: 5px;">
                                 <div class="progress-bar bg-success" style="width: 100%"></div>
@@ -133,143 +118,26 @@
                         </div>
                     </div>
                     
-                    <div class="timeline-item {{ 'completed' if file.audio_url else ('in-progress' if file.status == 'processing' and file.current_stage == 'extract_audio' else '') }}">
+                    <div class="timeline-item {{ 'completed' if file.status == 'completed' else ('in-progress' if file.status == 'processing' and file.current_stage == 'transcribing' else '') }}">
                         <div class="timeline-indicator-container">
-                            <div class="timeline-indicator {{ 'bg-success' if file.audio_url else ('bg-warning' if file.status == 'processing' and file.current_stage == 'extract_audio' else 'bg-light') }}">
-                                {% if file.audio_url %}
+                            <div class="timeline-indicator {{ 'bg-success' if file.status == 'completed' else ('bg-warning' if file.status == 'processing' and file.current_stage == 'transcribing' else 'bg-light') }}">
+                                {% if file.status == 'completed' %}
                                     <i class="fas fa-check text-white"></i>
-                                {% elif file.status == 'processing' and file.current_stage == 'extract_audio' %}
-                                    <i class="fas fa-circle-notch fa-spin text-white"></i>
-                                {% else %}
-                                    <i class="fas fa-volume-up text-muted"></i>
-                                {% endif %}
-                            </div>
-                            <div class="timeline-line"></div>
-                        </div>
-                        <div class="timeline-content">
-                            <h6 class="fw-bold">Audio Extraction</h6>
-                            <p class="text-muted mb-0 small">Extract audio from DCR file</p>
-                            {% if file.status == 'processing' and file.current_stage == 'extract_audio' %}
-                            <div class="progress mt-2" style="height: 5px;">
-                                <div class="progress-bar bg-warning" style="width: {{ file.stage_progress }}%"></div>
-                            </div>
-                            {% elif file.audio_url %}
-                            <div class="progress mt-2" style="height: 5px;">
-                                <div class="progress-bar bg-success" style="width: 100%"></div>
-                            </div>
-                            {% endif %}
-                        </div>
-                    </div>
-                    
-                    <div class="timeline-item {{ 'completed' if file.chunk_count else ('in-progress' if file.status == 'processing' and file.current_stage == 'chunk_audio' else '') }}">
-                        <div class="timeline-indicator-container">
-                            <div class="timeline-indicator {{ 'bg-success' if file.chunk_count else ('bg-warning' if file.status == 'processing' and file.current_stage == 'chunk_audio' else 'bg-light') }}">
-                                {% if file.chunk_count %}
-                                    <i class="fas fa-check text-white"></i>
-                                {% elif file.status == 'processing' and file.current_stage == 'chunk_audio' %}
-                                    <i class="fas fa-circle-notch fa-spin text-white"></i>
-                                {% else %}
-                                    <i class="fas fa-cut text-muted"></i>
-                                {% endif %}
-                            </div>
-                            <div class="timeline-line"></div>
-                        </div>
-                        <div class="timeline-content">
-                            <h6 class="fw-bold">Audio Chunking</h6>
-                            <p class="text-muted mb-0 small">Split audio into manageable chunks</p>
-                            {% if file.status == 'processing' and file.current_stage == 'chunk_audio' %}
-                            <div class="progress mt-2" style="height: 5px;">
-                                <div class="progress-bar bg-warning" style="width: {{ file.stage_progress }}%"></div>
-                            </div>
-                            {% elif file.chunk_count %}
-                            <div class="progress mt-2" style="height: 5px;">
-                                <div class="progress-bar bg-success" style="width: 100%"></div>
-                            </div>
-                            {% endif %}
-                        </div>
-                    </div>
-                    
-                    <div class="timeline-item {{ 'completed' if file.status == 'completed' or file.current_stage == 'diarization' or file.current_stage == 'stitch_transcript' else ('in-progress' if file.status == 'processing' and file.current_stage == 'transcribe_chunks' else '') }}">
-                        <div class="timeline-indicator-container">
-                            <div class="timeline-indicator {{ 'bg-success' if file.status == 'completed' or file.current_stage == 'diarization' or file.current_stage == 'stitch_transcript' else ('bg-warning' if file.status == 'processing' and file.current_stage == 'transcribe_chunks' else 'bg-light') }}">
-                                {% if file.status == 'completed' or file.current_stage == 'diarization' or file.current_stage == 'stitch_transcript' %}
-                                    <i class="fas fa-check text-white"></i>
-                                {% elif file.status == 'processing' and file.current_stage == 'transcribe_chunks' %}
+                                {% elif file.status == 'processing' and file.current_stage == 'transcribing' %}
                                     <i class="fas fa-circle-notch fa-spin text-white"></i>
                                 {% else %}
                                     <i class="fas fa-microphone-alt text-muted"></i>
                                 {% endif %}
                             </div>
-                            <div class="timeline-line"></div>
                         </div>
                         <div class="timeline-content">
-                            <h6 class="fw-bold">Speech Recognition</h6>
-                            <p class="text-muted mb-0 small">
-                                Convert speech to text 
-                                {% if file.status == 'processing' and file.current_stage == 'transcribe_chunks' and file.chunk_count %}
-                                    ({{ file.chunks_processed }}/{{ file.chunk_count }})
-                                {% endif %}
-                            </p>
-                            {% if file.status == 'processing' and file.current_stage == 'transcribe_chunks' %}
+                            <h6 class="fw-bold">Speech & Speaker Recognition</h6>
+                            <p class="text-muted mb-0 small">Converting speech to text and identifying speakers</p>
+                            {% if file.status == 'processing' and file.current_stage == 'transcribing' %}
                             <div class="progress mt-2" style="height: 5px;">
                                 <div class="progress-bar bg-warning" style="width: {{ file.stage_progress }}%"></div>
                             </div>
-                            {% elif file.status == 'completed' or file.current_stage == 'diarization' or file.current_stage == 'stitch_transcript' %}
-                            <div class="progress mt-2" style="height: 5px;">
-                                <div class="progress-bar bg-success" style="width: 100%"></div>
-                            </div>
-                            {% endif %}
-                        </div>
-                    </div>
-                    
-                    <div class="timeline-item {{ 'completed' if file.diarization_url else ('in-progress' if file.status == 'processing' and file.current_stage == 'diarization' else '') }}">
-                        <div class="timeline-indicator-container">
-                            <div class="timeline-indicator {{ 'bg-success' if file.diarization_url else ('bg-warning' if file.status == 'processing' and file.current_stage == 'diarization' else 'bg-light') }}">
-                                {% if file.diarization_url %}
-                                    <i class="fas fa-check text-white"></i>
-                                {% elif file.status == 'processing' and file.current_stage == 'diarization' %}
-                                    <i class="fas fa-circle-notch fa-spin text-white"></i>
-                                {% else %}
-                                    <i class="fas fa-users text-muted"></i>
-                                {% endif %}
-                            </div>
-                            <div class="timeline-line"></div>
-                        </div>
-                        <div class="timeline-content">
-                            <h6 class="fw-bold">Speaker Diarization</h6>
-                            <p class="text-muted mb-0 small">Identify speakers in audio</p>
-                            {% if file.status == 'processing' and file.current_stage == 'diarization' %}
-                            <div class="progress mt-2" style="height: 5px;">
-                                <div class="progress-bar bg-warning" style="width: {{ file.stage_progress }}%"></div>
-                            </div>
-                            {% elif file.diarization_url %}
-                            <div class="progress mt-2" style="height: 5px;">
-                                <div class="progress-bar bg-success" style="width: 100%"></div>
-                            </div>
-                            {% endif %}
-                        </div>
-                    </div>
-                    
-                    <div class="timeline-item {{ 'completed' if file.transcript_url else ('in-progress' if file.status == 'processing' and file.current_stage == 'stitch_transcript' else '') }}">
-                        <div class="timeline-indicator-container">
-                            <div class="timeline-indicator {{ 'bg-success' if file.transcript_url else ('bg-warning' if file.status == 'processing' and file.current_stage == 'stitch_transcript' else 'bg-light') }}">
-                                {% if file.transcript_url %}
-                                    <i class="fas fa-check text-white"></i>
-                                {% elif file.status == 'processing' and file.current_stage == 'stitch_transcript' %}
-                                    <i class="fas fa-circle-notch fa-spin text-white"></i>
-                                {% else %}
-                                    <i class="fas fa-file-alt text-muted"></i>
-                                {% endif %}
-                            </div>
-                        </div>
-                        <div class="timeline-content">
-                            <h6 class="fw-bold">Final Transcript</h6>
-                            <p class="text-muted mb-0 small">Generate final transcript with speaker labels</p>
-                            {% if file.status == 'processing' and file.current_stage == 'stitch_transcript' %}
-                            <div class="progress mt-2" style="height: 5px;">
-                                <div class="progress-bar bg-warning" style="width: {{ file.stage_progress }}%"></div>
-                            </div>
-                            {% elif file.transcript_url %}
+                            {% elif file.status == 'completed' %}
                             <div class="progress mt-2" style="height: 5px;">
                                 <div class="progress-bar bg-success" style="width: 100%"></div>
                             </div>
@@ -389,16 +257,8 @@ document.addEventListener('DOMContentLoaded', function() {
         // Update current stage text
         const stageText = document.querySelector('.card-body .d-flex.justify-content-between .text-muted.small');
         if (stageText) {
-            if (file.current_stage === 'extract_audio') {
-                stageText.textContent = 'Extracting Audio';
-            } else if (file.current_stage === 'chunk_audio') {
-                stageText.textContent = 'Chunking Audio';
-            } else if (file.current_stage === 'transcribe_chunks') {
-                stageText.textContent = `Transcribing (${file.chunks_processed || 0}/${file.chunk_count || '?'})`;
-            } else if (file.current_stage === 'diarization') {
-                stageText.textContent = 'Identifying Speakers';
-            } else if (file.current_stage === 'stitch_transcript') {
-                stageText.textContent = 'Generating Transcript';
+            if (file.current_stage === 'transcribing') {
+                stageText.textContent = 'Transcribing Audio';
             } else if (file.current_stage === 'queued') {
                 stageText.textContent = 'Queued for Processing';
             } else {
@@ -407,66 +267,20 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         // Update timeline indicators and progress bars
-        const timelineItems = document.querySelectorAll('.timeline-item');
-        
-        // Helper function to update timeline stage
-        function updateTimelineStage(stageIndex, stageName, isActive, isCompleted) {
-            const item = timelineItems[stageIndex];
-            if (!item) return;
+        const transcribingTimeline = document.querySelectorAll('.timeline-item')[1];
+        if (transcribingTimeline) {
+            const indicator = transcribingTimeline.querySelector('.timeline-indicator');
+            const progressBar = transcribingTimeline.querySelector('.progress-bar');
             
-            const indicator = item.querySelector('.timeline-indicator');
-            const icon = indicator.querySelector('i');
-            
-            // Update indicator color
-            if (isCompleted) {
-                indicator.className = 'timeline-indicator bg-success';
-                icon.className = 'fas fa-check text-white';
-            } else if (isActive) {
+            if (file.current_stage === 'transcribing') {
                 indicator.className = 'timeline-indicator bg-warning';
-                icon.className = 'fas fa-circle-notch fa-spin text-white';
-            }
-            
-            // Update progress bar if this is the active stage
-            if (isActive) {
-                const progressBar = item.querySelector('.progress-bar');
+                indicator.innerHTML = '<i class="fas fa-circle-notch fa-spin text-white"></i>';
+                
                 if (progressBar) {
                     progressBar.style.width = `${file.stage_progress}%`;
                 }
-                
-                // Update chunks counter for transcription
-                if (stageName === 'transcribe_chunks') {
-                    const text = item.querySelector('p.text-muted.small');
-                    if (text && file.chunk_count) {
-                        text.textContent = `Convert speech to text (${file.chunks_processed}/${file.chunk_count})`;
-                    }
-                }
             }
         }
-        
-        // Extract audio stage
-        updateTimelineStage(1, 'extract_audio', 
-            file.current_stage === 'extract_audio', 
-            file.audio_url !== null);
-            
-        // Chunk audio stage
-        updateTimelineStage(2, 'chunk_audio', 
-            file.current_stage === 'chunk_audio', 
-            file.chunk_count !== null);
-            
-        // Transcribe chunks stage
-        updateTimelineStage(3, 'transcribe_chunks', 
-            file.current_stage === 'transcribe_chunks', 
-            file.current_stage === 'diarization' || file.current_stage === 'stitch_transcript' || file.status === 'completed');
-            
-        // Diarization stage
-        updateTimelineStage(4, 'diarization', 
-            file.current_stage === 'diarization', 
-            file.diarization_url !== null);
-            
-        // Stitch transcript stage
-        updateTimelineStage(5, 'stitch_transcript', 
-            file.current_stage === 'stitch_transcript', 
-            file.transcript_url !== null);
     }
 });
 </script>
