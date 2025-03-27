@@ -9,7 +9,6 @@ from app.models import db_session
 from app.models.file import File
 from app.services.blob_storage import BlobStorageService
 from app.services.batch_transcription_service import BatchTranscriptionService
-import shutil
 from flask import current_app
 from sqlalchemy.orm import scoped_session, sessionmaker
 from datetime import datetime, timedelta
@@ -48,8 +47,8 @@ def get_blob_service():
 @shared_task
 def transcribe_file(file_id):
     """
-    Main Celery task that orchestrates the new 2024-11-15 batch
-    transcription pipeline using BatchTranscriptionService.
+    Main Celery task that orchestrates the batch transcription pipeline 
+    using Azure's Speech Service Batch Transcription API.
     """
     logger.info(f"=== Starting transcription pipeline for file {file_id} ===")
     start_time = time.time()
@@ -71,7 +70,7 @@ def transcribe_file(file_id):
         subscription_key = current_app.config["AZURE_SPEECH_KEY"]
         region = current_app.config["AZURE_SPEECH_REGION"]
 
-        # Create the new batch service instance
+        # Create the batch service instance
         transcription_service = BatchTranscriptionService(subscription_key, region)
 
         # Submit transcription job
@@ -79,7 +78,7 @@ def transcribe_file(file_id):
         result_job = transcription_service.submit_transcription(
             audio_url=file.blob_url,
             locale="en-US",
-            enable_diarization=True  # or False, depending on your needs
+            enable_diarization=True
         )
 
         transcription_id = result_job["id"]
@@ -101,7 +100,7 @@ def transcribe_file(file_id):
 
             # Update file progress
             if status == "Running":
-                # Let's do a synthetic ramp from 50% to 90% as we wait
+                # Synthetic ramp from 50% to 90% as we wait
                 progress = min(50 + (attempt / max_attempts) * 40, 90)
                 file.progress_percent = progress
                 session.commit()
@@ -114,9 +113,6 @@ def transcribe_file(file_id):
                 # Retrieve final transcription JSON
                 logger.info("Retrieving final transcription JSON for job %s", transcription_id)
                 result_json = transcription_service.get_transcription_result(transcription_id)
-                
-                # Add the snippet here:
-                logger.info("Final batch-transcription JSON:\n%s", json.dumps(result_json, indent=2))
 
                 # Store the JSON in Blob Storage
                 logger.info("Uploading final transcription JSON to Azure Blob.")
