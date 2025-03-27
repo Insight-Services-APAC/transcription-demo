@@ -193,13 +193,14 @@
     .timeline-line {
         position: absolute;
         top: 36px;
-        bottom: -36px;
+        bottom: -24px; /* Adjusted to remove the gap without overlapping */
         left: 18px;
         width: 2px;
         background-color: #e9ecef;
         transform: translateX(-50%);
         z-index: 1;
     }
+
     
     .timeline-item:last-child .timeline-line {
         display: none;
@@ -210,78 +211,4 @@
         flex: 1;
     }
 </style>
-{% endblock %}
-
-{% block scripts %}
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Check if the file is processing
-    const fileStatus = "{{ file.status }}";
-    const fileId = "{{ file.id }}";
-    
-    if (fileStatus === 'processing') {
-        // Poll for updates every 3 seconds
-        const intervalId = setInterval(function() {
-            fetch(`/api/files/${fileId}`)
-                .then(response => response.json())
-                .then(data => {
-                    // If processing is complete, reload the page
-                    if (data.status !== 'processing') {
-                        clearInterval(intervalId);
-                        window.location.reload();
-                        return;
-                    }
-                    
-                    // Update UI with new progress information
-                    updateProgressUI(data);
-                })
-                .catch(error => {
-                    console.error('Error fetching file status:', error);
-                });
-        }, 3000);
-    }
-    
-    function updateProgressUI(file) {
-        // Update progress bar
-        const progressBar = document.querySelector('.card-body .progress .progress-bar');
-        if (progressBar) {
-            progressBar.style.width = `${file.progress_percent}%`;
-        }
-        
-        // Update progress text
-        const progressText = document.querySelector('.card-body .d-flex.justify-content-between .fw-bold');
-        if (progressText) {
-            progressText.textContent = `${Math.round(file.progress_percent)}%`;
-        }
-        
-        // Update current stage text
-        const stageText = document.querySelector('.card-body .d-flex.justify-content-between .text-muted.small');
-        if (stageText) {
-            if (file.current_stage === 'transcribing') {
-                stageText.textContent = 'Transcribing Audio';
-            } else if (file.current_stage === 'queued') {
-                stageText.textContent = 'Queued for Processing';
-            } else {
-                stageText.textContent = 'Processing';
-            }
-        }
-        
-        // Update timeline indicators and progress bars
-        const transcribingTimeline = document.querySelectorAll('.timeline-item')[1];
-        if (transcribingTimeline) {
-            const indicator = transcribingTimeline.querySelector('.timeline-indicator');
-            const progressBar = transcribingTimeline.querySelector('.progress-bar');
-            
-            if (file.current_stage === 'transcribing') {
-                indicator.className = 'timeline-indicator bg-warning';
-                indicator.innerHTML = '<i class="fas fa-circle-notch fa-spin text-white"></i>';
-                
-                if (progressBar) {
-                    progressBar.style.width = `${file.stage_progress}%`;
-                }
-            }
-        }
-    }
-});
-</script>
 {% endblock %}

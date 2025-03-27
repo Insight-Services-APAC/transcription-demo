@@ -269,8 +269,8 @@ document.addEventListener('DOMContentLoaded', function() {
         durationDisplay.textContent = formatTime(audioElement.duration);
     });
     
-    // Fetch transcript data
-    fetch('/api/transcript/{{ file.id }}')
+    // Fetch transcript data using the blueprint route for API
+    fetch('{{ url_for("transcripts.api_transcript", file_id=file.id) }}')
         .then(response => {
             if (!response.ok) {
                 throw new Error('Failed to load transcript');
@@ -372,25 +372,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         
         return highlightedText;
-    }
-    
-    // Convert time format (HH:MM:SS) to seconds
-    function timeToSeconds(timeStr) {
-        const parts = timeStr.split(':');
-        let seconds = 0;
-        
-        if (parts.length === 3) {
-            // Format: HH:MM:SS.mmm
-            seconds += parseInt(parts[0]) * 3600; // Hours
-            seconds += parseInt(parts[1]) * 60;   // Minutes
-            seconds += parseFloat(parts[2]);      // Seconds with milliseconds
-        } else if (parts.length === 2) {
-            // Format: MM:SS.mmm
-            seconds += parseInt(parts[0]) * 60;   // Minutes
-            seconds += parseFloat(parts[1]);      // Seconds with milliseconds
-        }
-        
-        return seconds;
     }
     
     // Update active segment while playing

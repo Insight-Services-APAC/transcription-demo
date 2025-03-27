@@ -1,7 +1,5 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, current_app
-import os
-
-main_bp = Blueprint('main', __name__)
+from flask import redirect, url_for
+from app.main import main_bp
 
 @main_bp.route('/')
 def index():
@@ -11,4 +9,4 @@ def index():
 @main_bp.route('/health')
 def health():
     """Health check endpoint"""
-    return {'status': 'ok'} 
+    return {'status': 'ok'}

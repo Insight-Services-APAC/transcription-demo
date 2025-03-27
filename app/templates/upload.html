@@ -13,7 +13,7 @@
                     <p class="mb-0">Upload a .MP3 or .WAV file (up to 5GB) for transcription and speaker diarization.</p>
                 </div>
                 
-                <form method="POST" enctype="multipart/form-data" id="uploadForm">
+                <form method="POST" action="{{ url_for('files.upload') }}" enctype="multipart/form-data" id="uploadForm">
                     <div class="mb-4">
                         <div class="form-file-container p-4 rounded border border-2 border-dashed text-center position-relative">
                             <input class="form-control position-absolute opacity-0 top-0 start-0 w-100 h-100" 
@@ -219,18 +219,16 @@ document.addEventListener('DOMContentLoaded', function() {
                         // Parse the JSON response to get upload_id
                         const response = JSON.parse(xhr.responseText);
                         if (response.upload_id) {
-                            // Start polling for azure upload progress
+                            // Start polling for azure upload progress using the blueprint route
                             pollAzureUploadProgress(response.upload_id, fileSize);
                         } else {
                             handleUploadError('Invalid server response');
                         }
                     } catch (e) {
-                        // Server responded but not with expected JSON
                         console.error("JSON parse error", e, "Response was:", xhr.responseText);
                         handleUploadError('Error parsing server response: ' + e.message);
                     }
                 } else {
-                    // Handle local upload errors
                     handleUploadError('Upload failed with status ' + xhr.status);
                 }
             });
@@ -240,8 +238,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 handleUploadError('Network error occurred');
             });
             
-            // Open and send the request to a special endpoint that returns upload ID
-            xhr.open('POST', '/upload/start', true);
+            // Open and send the request to the AJAX upload start endpoint using the blueprint route
+            xhr.open('POST', '{{ url_for("files.start_upload") }}', true);
             xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
             xhr.send(formData);
         }
@@ -264,22 +262,19 @@ function pollAzureUploadProgress(uploadId, fileSize) {
     const progressInterval = setInterval(function() {
         pollCount++;
         
-        // Check if we've reached the maximum number of polls
         if (pollCount > maxPolls) {
             clearInterval(progressInterval);
             handleUploadError('Upload timeout after 30 minutes');
             return;
         }
         
-        // Fetch progress from server
-        fetch(`/upload/progress/${uploadId}`)
+        // Fetch progress from server using the blueprint route (the URL here is relative)
+        fetch('{{ url_for("files.upload_progress", upload_id="UPLOAD_ID_PLACEHOLDER") }}'.replace('UPLOAD_ID_PLACEHOLDER', uploadId))
             .then(response => response.json())
             .then(data => {
-                // Log the response for debugging
                 console.log("Progress response:", data);
                 
                 if (data.error) {
-                    // Only clear interval and show error after multiple error responses
                     consecutiveEmptyResponses++;
                     if (consecutiveEmptyResponses >= maxEmptyResponses) {
                         clearInterval(progressInterval);
@@ -289,30 +284,25 @@ function pollAzureUploadProgress(uploadId, fileSize) {
                     return;
                 }
                 
-                // Reset consecutive error count if we got a good response
                 consecutiveEmptyResponses = 0;
                 
                 if (data.status === 'completed') {
-                    // Upload complete
                     clearInterval(progressInterval);
                     uploadProgressBar.style.width = '100%';
                     uploadPercentage.textContent = '100%';
                     uploadStatusText.innerHTML = '<small class="text-success">Upload complete! Processing file...</small>';
                     currentStage.textContent = 'Processing';
                     
-                    // Redirect to the file detail page
                     if (data.redirect_url) {
                         window.location.href = data.redirect_url;
                     } else {
-                        window.location.href = '/files';
+                        window.location.href = '{{ url_for("files.file_list") }}';
                     }
                     return;
                 }
                 
                 if (data.status === 'uploading') {
-                    // If we have real progress data
                     if (data.progress > 0 || data.uploaded_bytes > 0) {
-                        // Calculate Azure upload speed
                         const elapsedTime = Date.now() - azureUploadStartTime;
                         const progressChange = data.progress - lastAzureProgress;
                         
@@ -323,16 +313,13 @@ function pollAzureUploadProgress(uploadId, fileSize) {
                             azureUploadStartTime = Date.now();
                         }
                         
-                        // Azure upload is 75% of total progress (after the 25% local upload)
                         const azurePercentComplete = data.progress;
                         const totalPercentComplete = 25 + (azurePercentComplete * 0.75);
                         
-                        // Update progress bar
                         uploadProgressBar.style.width = totalPercentComplete + '%';
                         uploadPercentage.textContent = Math.round(totalPercentComplete) + '%';
                         uploadStatusText.innerHTML = '<small class="text-muted">Uploading to Azure storage...</small>';
                         
-                        // Estimate time remaining for Azure upload
                         if (azureUploadSpeed > 0) {
                             const remainingPercent = 100 - azurePercentComplete;
                             const remainingBytes = fileSize * (remainingPercent / 100);
@@ -341,8 +328,6 @@ function pollAzureUploadProgress(uploadId, fileSize) {
                             timeRemaining.textContent = formatTimeRemaining(remainingTimeSec);
                         }
                     } else {
-                        // We are uploading but no progress data yet
-                        // Only update status if it's been a while without progress data
                         if (pollCount > 10) {
                             uploadStatusText.innerHTML = '<small class="text-muted">Upload in progress, waiting for progress data...</small>';
                         }
@@ -351,18 +336,14 @@ function pollAzureUploadProgress(uploadId, fileSize) {
             })
             .catch(error => {
                 console.error('Error polling for progress:', error);
-                
-                // Don't clear interval on network errors, just try again
                 consecutiveEmptyResponses++;
                 if (consecutiveEmptyResponses >= 10) {
-                    // After 10 consecutive network errors, show a message
                     uploadStatusText.innerHTML = '<small class="text-warning">Network issues, retrying...</small>';
                 }
             });
     }, pollInterval);
 }
     
-    // Handle upload errors
     function handleUploadError(message) {
         uploadButton.disabled = false;
         uploadButton.innerHTML = '<i class="fas fa-upload me-2"></i>Try Again';
@@ -371,7 +352,6 @@ function pollAzureUploadProgress(uploadId, fileSize) {
         console.error('Upload error:', message);
     }
     
-    // Prevent defaults for drag and drop
     ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
         dropArea.addEventListener(eventName, preventDefaults, false);
     });
@@ -381,7 +361,6 @@ function pollAzureUploadProgress(uploadId, fileSize) {
         e.stopPropagation();
     }
     
-    // Highlight drop area when dragging over it
     ['dragenter', 'dragover'].forEach(eventName => {
         dropArea.addEventListener(eventName, highlight, false);
     });
@@ -400,7 +379,6 @@ function pollAzureUploadProgress(uploadId, fileSize) {
         }
     }
     
-    // Handle dropped files
     dropArea.addEventListener('drop', handleDrop, false);
     
     function handleDrop(e) {
@@ -408,7 +386,6 @@ function pollAzureUploadProgress(uploadId, fileSize) {
         const files = dt.files;
         fileInput.files = files;
         
-        // Trigger change event to update UI
         const event = new Event('change');
         fileInput.dispatchEvent(event);
     }

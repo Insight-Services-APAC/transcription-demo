@@ -19,9 +19,9 @@ def create_app(config_name='default'):
     init_db(app)
     
     # Register blueprints
-    from app.routes.main import main_bp
+    from app.main import main_bp
     from app.files import files_bp
-    from app.routes.transcripts import transcripts_bp
+    from app.transcripts import transcripts_bp
     
     app.register_blueprint(main_bp)
     app.register_blueprint(files_bp)

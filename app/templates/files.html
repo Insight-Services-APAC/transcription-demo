@@ -163,8 +163,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             
-            // Fetch file status
-            fetch(`/api/files/${fileId}`)
+            // Fetch file status using the blueprint route
+            fetch('{{ url_for("files.api_file_detail", file_id="FILE_ID_PLACEHOLDER") }}'.replace('FILE_ID_PLACEHOLDER', fileId))
                 .then(response => response.json())
                 .then(file => {
                     updateFileRow(file);

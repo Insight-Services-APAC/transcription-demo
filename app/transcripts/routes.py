@@ -1,12 +1,11 @@
-from flask import Blueprint, render_template, abort, jsonify, current_app, request
+from flask import render_template, abort, jsonify, current_app, request
 from app.models import db_session
 from app.models.file import File
 import json
 import requests
 from app.services.blob_storage import BlobStorageService
 import traceback
-
-transcripts_bp = Blueprint('transcripts', __name__)
+from app.transcripts import transcripts_bp
 
 
 @transcripts_bp.route('/transcript/<file_id>')
