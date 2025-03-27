@@ -1,4 +1,3 @@
-# app/__init__.py
 import os
 from flask import Flask
 from config import config
@@ -7,14 +6,15 @@ from app.tasks.celery_app import make_celery
 from flask_migrate import Migrate
 
 def create_app(config_name='default'):
-    app = Flask(__name__)
+    app = Flask(__name__, instance_relative_config=True)
     
     # Load configuration
     app_config = config[config_name]
     app.config.from_object(app_config)
     
-    # Create uploads directory if it doesn't exist
+    # Create necessary directories: uploads and instance folder
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+    os.makedirs(app.instance_path, exist_ok=True)
     
     # Initialize extensions
     db.init_app(app)

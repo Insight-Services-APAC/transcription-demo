@@ -1,4 +1,4 @@
-from app.models import init_db
+import app.models
 import os
 from dotenv import load_dotenv
 from app import create_app
