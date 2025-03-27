@@ -1,10 +1,11 @@
+# app/__init__.py
 import os
 from flask import Flask
-from app.models import init_db
-from app.tasks.celery_app import make_celery
 from config import config
+from app.extensions import db
+from app.tasks.celery_app import make_celery
+from flask_migrate import Migrate
 
-# Initialize Flask app
 def create_app(config_name='default'):
     app = Flask(__name__)
     
@@ -15,8 +16,9 @@ def create_app(config_name='default'):
     # Create uploads directory if it doesn't exist
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
     
-    # Initialize database
-    init_db(app)
+    # Initialize extensions
+    db.init_app(app)
+    Migrate(app, db)
     
     # Register blueprints
     from app.main import main_bp

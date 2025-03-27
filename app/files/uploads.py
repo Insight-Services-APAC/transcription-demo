@@ -3,7 +3,7 @@ import uuid
 import time
 from flask import render_template, request, redirect, url_for, flash, current_app, jsonify
 from werkzeug.utils import secure_filename
-from app.models import db_session
+from app.extensions import db
 from app.models.file import File
 from app.files import files_bp
 from app.services.blob_storage import BlobStorageService
@@ -35,8 +35,7 @@ def upload():
 
         try:
             # Save file to local upload folder temporarily
-            tmp_path = os.path.join(
-                current_app.config['UPLOAD_FOLDER'], filename)
+            tmp_path = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
             file.save(tmp_path)
 
             # If AJAX request, return upload ID instead of redirecting
@@ -65,7 +64,6 @@ def upload():
                 })
 
             # Regular form submission - upload to Azure directly
-            # Upload to Azure Blob Storage
             blob_service = BlobStorageService(
                 connection_string=current_app.config['AZURE_STORAGE_CONNECTION_STRING'],
                 container_name=current_app.config['AZURE_STORAGE_CONTAINER']
@@ -82,8 +80,8 @@ def upload():
                 progress_percent=0.0
             )
 
-            db_session.add(file_record)
-            db_session.commit()
+            db.session.add(file_record)
+            db.session.commit()
 
             # Remove temporary file
             os.remove(tmp_path)
@@ -92,9 +90,7 @@ def upload():
             from app.tasks.transcription_tasks import transcribe_file
             transcribe_file.delay(file_record.id)
 
-            # Redirect to file dashboard
-            flash(
-                'File uploaded successfully. Processing has started automatically.', 'success')
+            flash('File uploaded successfully. Processing has started automatically.', 'success')
             return redirect(url_for('files.file_list'))
 
         except Exception as e:
@@ -109,33 +105,25 @@ def upload():
 def start_upload():
     """Handle AJAX upload start"""
     if request.method == 'POST':
-        # Check if a file was uploaded
         if 'file' not in request.files:
             return jsonify({'error': 'No file part'})
 
         file = request.files['file']
 
-        # Check if file was selected
         if file.filename == '':
             return jsonify({'error': 'No file selected'})
 
-        # Check file extension
         if not file.filename.lower().endswith(('.mp3', '.wav')):
             return jsonify({'error': 'Only .MP3 and .WAV files are allowed'})
 
-        # Create secure filename
         filename = secure_filename(file.filename)
 
         try:
-            # Save file to local upload folder temporarily
-            tmp_path = os.path.join(
-                current_app.config['UPLOAD_FOLDER'], filename)
+            tmp_path = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
             file.save(tmp_path)
 
-            # Generate upload ID
             upload_id = str(uuid.uuid4())
 
-            # Initialize progress tracking in Redis
             progress_tracker = UploadProgressTracker()
             progress_tracker.update_progress(upload_id, {
                 'file_path': tmp_path,
@@ -146,17 +134,14 @@ def start_upload():
                 'start_time': time.time()
             })
 
-            # Start Celery task for Azure upload
             task = upload_to_azure_task.delay(tmp_path, filename, upload_id)
 
-            # Return JSON response with upload_id and task_id
             return jsonify({
                 'upload_id': upload_id,
                 'task_id': task.id
             })
 
         except Exception as e:
-            # Ensure any error is properly converted to JSON
             error_message = str(e)
             current_app.logger.error(f"Error in start_upload: {error_message}")
             return jsonify({'error': f'Error uploading file: {error_message}'})
