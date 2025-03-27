@@ -1,6 +1,5 @@
 import os
 import uuid
-import threading
 import time
 from flask import render_template, request, redirect, url_for, flash, current_app, jsonify
 from werkzeug.utils import secure_filename
@@ -8,8 +7,7 @@ from app.models import db_session
 from app.models.file import File
 from app.files import files_bp
 from app.services.blob_storage import BlobStorageService
-from app.tasks.transcription_tasks import transcribe_file
-from app.files.progress import local_uploads, upload_to_azure
+from app.tasks.upload_tasks import upload_to_azure_task, UploadProgressTracker
 
 @files_bp.route('/upload', methods=['GET', 'POST'])
 def upload():
@@ -44,19 +42,27 @@ def upload():
             # If AJAX request, return upload ID instead of redirecting
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                 upload_id = str(uuid.uuid4())
-
-                # Get the current app object for the thread
+                
+                # Initialize progress tracker using current app
                 app = current_app._get_current_object()
+                progress_tracker = UploadProgressTracker(app)
+                progress_tracker.update_progress(upload_id, {
+                    'file_path': tmp_path,
+                    'filename': filename,
+                    'status': 'local_complete',
+                    'azure_status': 'pending',
+                    'progress': 0,
+                    'stage': 'preparing',
+                    'start_time': time.time()
+                })
+                
+                # Start Celery task for Azure upload
+                task = upload_to_azure_task.delay(tmp_path, filename, upload_id)
 
-                # Start upload in background thread
-                thread = threading.Thread(
-                    target=upload_to_azure,
-                    args=(tmp_path, filename, upload_id, app)
-                )
-                thread.daemon = True
-                thread.start()
-
-                return jsonify({'upload_id': upload_id})
+                return jsonify({
+                    'upload_id': upload_id,
+                    'task_id': task.id
+                })
 
             # Regular form submission - upload to Azure directly
             # Upload to Azure Blob Storage
@@ -83,6 +89,7 @@ def upload():
             os.remove(tmp_path)
 
             # Automatically start transcription process
+            from app.tasks.transcription_tasks import transcribe_file
             transcribe_file.delay(file_record.id)
 
             # Redirect to file dashboard
@@ -128,29 +135,25 @@ def start_upload():
             # Generate upload ID
             upload_id = str(uuid.uuid4())
 
-            # Store upload info
-            local_uploads[upload_id] = {
+            # Initialize progress tracking in Redis
+            progress_tracker = UploadProgressTracker()
+            progress_tracker.update_progress(upload_id, {
                 'file_path': tmp_path,
                 'filename': filename,
                 'status': 'local_complete',
                 'azure_status': 'pending',
                 'progress': 0,
                 'start_time': time.time()
-            }
+            })
 
-            # Get the current app object for the thread
-            app = current_app._get_current_object()
+            # Start Celery task for Azure upload
+            task = upload_to_azure_task.delay(tmp_path, filename, upload_id)
 
-            # Start upload in background thread
-            thread = threading.Thread(
-                target=upload_to_azure,
-                args=(tmp_path, filename, upload_id, app)
-            )
-            thread.daemon = True
-            thread.start()
-
-            # Return JSON response with upload_id
-            return jsonify({'upload_id': upload_id})
+            # Return JSON response with upload_id and task_id
+            return jsonify({
+                'upload_id': upload_id,
+                'task_id': task.id
+            })
 
         except Exception as e:
             # Ensure any error is properly converted to JSON

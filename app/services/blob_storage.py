@@ -11,7 +11,9 @@ from datetime import datetime, timedelta
 import threading
 import json
 from urllib.parse import urlparse
+import logging
 
+logger = logging.getLogger(__name__)
 
 class BlobStorageService:
     def __init__(self, connection_string, container_name):
@@ -26,7 +28,7 @@ class BlobStorageService:
         self.upload_progress = {}
         self.upload_lock = threading.Lock()
 
-        print(f"BlobStorageService initialized (thread ID: {threading.get_ident()})")
+        logger.info(f"BlobStorageService initialized (thread ID: {threading.get_ident()})")
 
         # Create container if it doesn't exist
         try:
@@ -35,7 +37,7 @@ class BlobStorageService:
             # Likely the container already exists; ignore
             pass
 
-    def upload_file(self, file_path, blob_path, upload_id=None):
+    def upload_file(self, file_path, blob_path, upload_id=None, progress_tracker=None):
         """
         Upload a file from local path to Azure Blob Storage and then
         generate a read-only SAS URL that the Speech API can use.
@@ -44,16 +46,15 @@ class BlobStorageService:
             file_path (str): path to local file
             blob_path (str): desired path/name in blob storage
             upload_id (str, optional): ID for tracking progress
+            progress_tracker: UploadProgressTracker instance for Redis-based progress tracking
 
         Returns:
             str: A SAS URL for the uploaded blob (with read permission).
         """
-        import threading
-
         # We'll store the final SAS URL in a local variable
         sas_url = None
 
-        print(f"Starting upload_file: file_path={file_path}, blob_path={blob_path}, upload_id={upload_id}, thread={threading.get_ident()}")
+        logger.info(f"Starting upload_file: file_path={file_path}, blob_path={blob_path}, upload_id={upload_id}")
 
         # Build the BlobClient
         blob_client = self.blob_service_client.get_blob_client(
@@ -64,7 +65,7 @@ class BlobStorageService:
         # Decide content-type from extension
         content_type = self._get_content_type(file_path)
         file_size = os.path.getsize(file_path)
-        print(f"Uploading file of size {file_size} bytes with content-type={content_type}")
+        logger.info(f"Uploading file of size {file_size} bytes with content-type={content_type}")
 
         # Track progress
         uploaded_bytes = 0
@@ -81,21 +82,36 @@ class BlobStorageService:
                 current = 1024  # fallback
 
             uploaded_bytes += current
-            with self.upload_lock:
-                if upload_id:
-                    if upload_id not in self.upload_progress:
-                        self.upload_progress[upload_id] = {
-                            "status": "uploading",
-                            "progress": 0,
-                            "file_size": file_size,
-                            "uploaded_bytes": 0,
-                            "last_update": time.time(),
-                        }
-                    # Update the tracking dictionary
-                    self.upload_progress[upload_id]["uploaded_bytes"] = uploaded_bytes
-                    progress_pct = min(99, int((uploaded_bytes / file_size) * 100))
-                    self.upload_progress[upload_id]["progress"] = progress_pct
-                    self.upload_progress[upload_id]["last_update"] = time.time()
+            
+            # Update progress using the provided tracker or in-memory dict
+            if upload_id:
+                if progress_tracker:
+                    # Use Redis-based tracker
+                    progress_data = {
+                        "status": "uploading",
+                        "progress": min(99, int((uploaded_bytes / file_size) * 100)),
+                        "file_size": file_size,
+                        "uploaded_bytes": uploaded_bytes,
+                        "stage": "azure_upload",
+                        "azure_status": "in_progress"
+                    }
+                    progress_tracker.update_progress(upload_id, progress_data)
+                else:
+                    # Fall back to in-memory tracking
+                    with self.upload_lock:
+                        if upload_id not in self.upload_progress:
+                            self.upload_progress[upload_id] = {
+                                "status": "uploading",
+                                "progress": 0,
+                                "file_size": file_size,
+                                "uploaded_bytes": 0,
+                                "last_update": time.time(),
+                            }
+                        # Update the tracking dictionary
+                        self.upload_progress[upload_id]["uploaded_bytes"] = uploaded_bytes
+                        progress_pct = min(99, int((uploaded_bytes / file_size) * 100))
+                        self.upload_progress[upload_id]["progress"] = progress_pct
+                        self.upload_progress[upload_id]["last_update"] = time.time()
 
         try:
             with open(file_path, "rb") as data:
@@ -107,16 +123,29 @@ class BlobStorageService:
                     raw_response_hook=progress_callback
                 )
 
-            print(f"Upload completed. callback_count={callback_count}, total bytes={uploaded_bytes}")
+            logger.info(f"Upload completed. callback_count={callback_count}, total bytes={uploaded_bytes}")
 
-            # Mark upload as done if we were tracking
+            # Mark upload as done
             if upload_id:
-                with self.upload_lock:
-                    if upload_id in self.upload_progress:
-                        self.upload_progress[upload_id]["status"] = "completed"
-                        self.upload_progress[upload_id]["progress"] = 100
-                        self.upload_progress[upload_id]["uploaded_bytes"] = file_size
-                        self.upload_progress[upload_id]["last_update"] = time.time()
+                if progress_tracker:
+                    # Update progress in Redis
+                    progress_data = {
+                        "status": "uploading",
+                        "progress": 100,
+                        "file_size": file_size,
+                        "uploaded_bytes": file_size,
+                        "stage": "finalizing",
+                        "azure_status": "completed"
+                    }
+                    progress_tracker.update_progress(upload_id, progress_data)
+                else:
+                    # Update in-memory progress
+                    with self.upload_lock:
+                        if upload_id in self.upload_progress:
+                            self.upload_progress[upload_id]["status"] = "completed"
+                            self.upload_progress[upload_id]["progress"] = 100
+                            self.upload_progress[upload_id]["uploaded_bytes"] = file_size
+                            self.upload_progress[upload_id]["last_update"] = time.time()
 
             # Now generate a read-only SAS URL for the uploaded blob
             account_name = self.blob_service_client.account_name
@@ -139,12 +168,25 @@ class BlobStorageService:
             return sas_url
 
         except Exception as e:
-            print(f"Error uploading file: {str(e)}")
+            logger.error(f"Error uploading file: {str(e)}")
+            
+            # Update progress with error
             if upload_id:
-                with self.upload_lock:
-                    if upload_id in self.upload_progress:
-                        self.upload_progress[upload_id]["status"] = "error"
-                        self.upload_progress[upload_id]["error"] = str(e)
+                if progress_tracker:
+                    # Update progress in Redis
+                    progress_data = {
+                        "status": "error",
+                        "azure_status": "error",
+                        "error": str(e)
+                    }
+                    progress_tracker.update_progress(upload_id, progress_data)
+                else:
+                    # Update in-memory progress
+                    with self.upload_lock:
+                        if upload_id in self.upload_progress:
+                            self.upload_progress[upload_id]["status"] = "error"
+                            self.upload_progress[upload_id]["error"] = str(e)
+            
             raise e
 
     def download_file(self, blob_path, local_path):
@@ -167,7 +209,6 @@ class BlobStorageService:
             container=self.container_name,
             blob=blob_path
         )
-        from datetime import datetime, timedelta
 
         # Upload
         blob_client.upload_blob(

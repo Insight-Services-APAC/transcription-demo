@@ -23,6 +23,7 @@ class FileUploadManager {
         this.timeRemaining = document.getElementById('timeRemaining');
         
         this.progressPollInterval = null;
+        this.taskStatusInterval = null;
         this.initEventListeners();
     }
     
@@ -175,14 +176,16 @@ class FileUploadManager {
                     
                     try {
                         // Local upload complete, now update for azure upload (remaining 75%)
-                        this.uploadStatusText.innerHTML = '<small class="text-muted">Uploading to Azure storage...</small>';
-                        this.currentStage.textContent = 'Azure storage upload';
+                        this.uploadStatusText.innerHTML = '<small class="text-muted">Starting Celery task for Azure upload...</small>';
+                        this.currentStage.textContent = 'Initializing Azure upload';
                         
-                        // Parse the JSON response to get upload_id
+                        // Parse the JSON response to get upload_id and task_id
                         const response = JSON.parse(xhr.responseText);
-                        if (response.upload_id) {
-                            // Start polling for azure upload progress
-                            this.pollAzureUploadProgress(response.upload_id, fileSize);
+                        if (response.upload_id && response.task_id) {
+                            console.log(`Upload ID: ${response.upload_id}, Task ID: ${response.task_id}`);
+                            
+                            // Start polling for upload progress
+                            this.pollUploadProgress(response.upload_id, response.task_id, fileSize);
                         } else {
                             this.handleUploadError('Invalid server response');
                         }
@@ -208,9 +211,9 @@ class FileUploadManager {
     }
     
     /**
-     * Poll for Azure upload progress
+     * Poll for upload progress and task status
      */
-    pollAzureUploadProgress(uploadId, fileSize) {
+    pollUploadProgress(uploadId, taskId, fileSize) {
         const pollInterval = 1500; // 1.5 seconds
         const maxPolls = 1800; // 30 minutes max (at 1.5s each)
         let pollCount = 0;
@@ -223,6 +226,7 @@ class FileUploadManager {
         // Show initial message
         this.uploadStatusText.innerHTML = '<small class="text-muted">Preparing Azure upload...</small>';
         
+        // Poll for progress updates from the upload_progress endpoint
         this.progressPollInterval = setInterval(() => {
             pollCount++;
             
@@ -254,6 +258,10 @@ class FileUploadManager {
                     
                     if (data.status === 'completed') {
                         clearInterval(this.progressPollInterval);
+                        if (this.taskStatusInterval) {
+                            clearInterval(this.taskStatusInterval);
+                        }
+                        
                         this.uploadProgressBar.style.width = '100%';
                         this.uploadPercentage.textContent = '100%';
                         this.uploadStatusText.innerHTML = '<small class="text-success">Upload complete! Processing file...</small>';
@@ -286,6 +294,10 @@ class FileUploadManager {
                             this.uploadPercentage.textContent = Math.round(totalPercentComplete) + '%';
                             this.uploadStatusText.innerHTML = '<small class="text-muted">Uploading to Azure storage...</small>';
                             
+                            if (data.stage) {
+                                this.currentStage.textContent = data.stage === 'azure_upload' ? 'Azure upload' : data.stage;
+                            }
+                            
                             if (azureUploadSpeed > 0) {
                                 const remainingPercent = 100 - azurePercentComplete;
                                 const remainingBytes = fileSize * (remainingPercent / 100);
@@ -308,6 +320,29 @@ class FileUploadManager {
                     }
                 });
         }, pollInterval);
+        
+        // Also poll for task status as a backup
+        this.taskStatusInterval = setInterval(() => {
+            const taskStatusUrl = `/task/status/${taskId}`;
+            
+            fetch(taskStatusUrl)
+                .then(response => response.json())
+                .then(data => {
+                    console.log("Task status:", data);
+                    
+                    if (data.state === 'FAILURE') {
+                        clearInterval(this.progressPollInterval);
+                        clearInterval(this.taskStatusInterval);
+                        this.handleUploadError(data.error || 'Task failed');
+                    } else if (data.state === 'SUCCESS') {
+                        // Task completed successfully, we'll let the progress endpoint handle redirect
+                        clearInterval(this.taskStatusInterval);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error polling for task status:', error);
+                });
+        }, 5000); // Check task status every 5 seconds
     }
     
     /**
@@ -316,6 +351,9 @@ class FileUploadManager {
     handleUploadError(message) {
         if (this.progressPollInterval) {
             clearInterval(this.progressPollInterval);
+        }
+        if (this.taskStatusInterval) {
+            clearInterval(this.taskStatusInterval);
         }
         
         this.uploadButton.disabled = false;
