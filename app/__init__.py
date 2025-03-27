@@ -20,7 +20,7 @@ def create_app(config_name='default'):
     
     # Register blueprints
     from app.routes.main import main_bp
-    from app.routes.files import files_bp
+    from app.files import files_bp
     from app.routes.transcripts import transcripts_bp
     
     app.register_blueprint(main_bp)
