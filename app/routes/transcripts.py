@@ -45,9 +45,6 @@ def api_transcript(file_id):
             container_name=current_app.config['AZURE_STORAGE_CONTAINER']
         )
 
-        # Extract the blob path from the transcript_url
-        blob_path = blob_service.parse_blob_path_from_sas_url(file.transcript_url)
-
         # Fetch transcript JSON from that fresh SAS URL
         response = requests.get(file.transcript_url)
         response.raise_for_status()
