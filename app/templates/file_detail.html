@@ -2,6 +2,10 @@
 
 {% block title %}File Details - {{ file.filename }} - NSWCC Transcription Demo{% endblock %}
 
+{% block stylesheets %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/file-detail.css') }}">
+{% endblock %}
+
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div class="d-flex align-items-center">
@@ -70,7 +74,7 @@
                         <div class="progress-bar" role="progressbar" style="width: {{ file.progress_percent }}%"></div>
                     </div>
                     <div class="d-flex justify-content-between">
-                        <span class="text-muted small">
+                        <span class="text-muted small current-stage">
                             {% if file.current_stage == 'transcribing' %}
                                 Transcribing Audio
                             {% elif file.current_stage == 'queued' %}
@@ -79,7 +83,7 @@
                                 Processing
                             {% endif %}
                         </span>
-                        <span class="fw-bold">{{ file.progress_percent|int }}%</span>
+                        <span class="fw-bold progress-percent">{{ file.progress_percent|int }}%</span>
                     </div>
                 </div>
                 {% endif %}
@@ -149,66 +153,11 @@
         </div>
     </div>
 </div>
+{% endblock %}
 
-<style>
-    .btn-icon {
-        width: 40px;
-        height: 40px;
-        padding: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 8px;
-    }
-    
-    .timeline {
-        position: relative;
-    }
-    
-    .timeline-item {
-        display: flex;
-        margin-bottom: 1.5rem;
-    }
-    
-    .timeline-item:last-child {
-        margin-bottom: 0;
-    }
-    
-    .timeline-indicator-container {
-        position: relative;
-        margin-right: 1.25rem;
-    }
-    
-    .timeline-indicator {
-        width: 36px;
-        height: 36px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin-right: 1rem;
-        z-index: 2;
-    }
-    
-    .timeline-line {
-        position: absolute;
-        top: 36px;
-        bottom: -24px; /* Adjusted to remove the gap without overlapping */
-        left: 18px;
-        width: 2px;
-        background-color: #e9ecef;
-        transform: translateX(-50%);
-        z-index: 1;
-    }
-
-    
-    .timeline-item:last-child .timeline-line {
-        display: none;
-    }
-    
-    .timeline-content {
-        padding-top: 0.25rem;
-        flex: 1;
-    }
-</style>
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/file-detail.js') }}"></script>
+<script>
+    document.body.dataset.fileApiUrl = "{{ url_for('files.api_file_detail', file_id=file.id) }}";
+</script>
 {% endblock %}

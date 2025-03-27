@@ -1,0 +1,62 @@
+/**
+ * Styles for file detail page
+ */
+
+.btn-icon {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+}
+
+.timeline {
+    position: relative;
+}
+
+.timeline-item {
+    display: flex;
+    margin-bottom: 1.5rem;
+}
+
+.timeline-item:last-child {
+    margin-bottom: 0;
+}
+
+.timeline-indicator-container {
+    position: relative;
+    margin-right: 1.25rem;
+}
+
+.timeline-indicator {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 1rem;
+    z-index: 2;
+}
+
+.timeline-line {
+    position: absolute;
+    top: 36px;
+    bottom: -24px; /* Adjusted to remove the gap without overlapping */
+    left: 18px;
+    width: 2px;
+    background-color: #e9ecef;
+    transform: translateX(-50%);
+    z-index: 1;
+}
+
+.timeline-item:last-child .timeline-line {
+    display: none;
+}
+
+.timeline-content {
+    padding-top: 0.25rem;
+    flex: 1;
+}

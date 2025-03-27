@@ -1,0 +1,21 @@
+/**
+ * Styles for file upload page
+ */
+
+.border-dashed {
+    border-style: dashed !important;
+}
+
+.form-file-container {
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+}
+
+.form-file-container:hover {
+    background-color: var(--light-bg);
+}
+
+.form-file-container.has-file {
+    border-color: var(--primary-color) !important;
+    background-color: rgba(67, 97, 238, 0.05);
+}
