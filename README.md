@@ -1,107 +1,125 @@
 # Transcription Demo Application
 
-This project is a web-based transcription demo that enables users to upload audio files, process them asynchronously, and receive both transcriptions and speaker diarization results. It leverages Flask for the web interface, Celery for background task processing, and various Azure services (Blob Storage, Speech Services) to handle audio file storage and transcription. The application also includes features for tracking upload progress and real-time status updates.
+A Flask-based web application for uploading, transcribing, and analyzing audio files with speaker diarization capabilities, powered by Azure Speech Services.
 
 ## Overview
 
-The Transcription Demo Application allows users to:
-- **Upload Audio Files:** Supports common formats like MP3 and WAV (up to 5GB).
-- **Process Files Asynchronously:** Uses Celery tasks to handle intensive operations such as audio extraction, transcription via Azure Speech Services, and speaker diarization.
-- **Display Processing Status:** Provides real-time progress updates through a web dashboard.
-- **View Transcripts:** Once processed, users can view the transcript with speaker labels and download both the audio and the JSON transcript.
+This application provides a user-friendly interface for audio transcription with the following features:
+
+- File upload handling with progress tracking
+- Azure Blob Storage integration for file storage
+- Asynchronous transcription processing using Celery
+- Speaker diarization (identifying different speakers in audio)
+- Interactive transcript viewer with synchronized audio playback
+- Word-level confidence highlighting
+
+## Technology Stack
+
+- **Backend**: Flask, SQLAlchemy, Celery
+- **Frontend**: Bootstrap 5, JavaScript, HTML/CSS
+- **Storage**: Azure Blob Storage
+- **Transcription**: Azure Speech Services
+- **Task Queue**: Redis
+- **Database**: SQLite (development), PostgreSQL (production)
+
+## Project Structure
+
+### Core Application Files
+
+- `app.py` - Entry point for the Flask application
+- `celery_worker.py` - Worker process for Celery task queue
+- `config.py` - Configuration classes for different environments
+- `run_debug.sh` - Shell script to start the application in debug mode
+- `setup.py` - Python package definition and dependencies
+
+### App Module
+
+The `app/` directory contains the main application components:
+
+#### Models
+
+- `app/models/__init__.py` - Database initialization
+- `app/models/file.py` - File model for tracking upload and transcription status
+
+#### Routes
+
+- `app/routes/files.py` - Handles file uploads and listing
+- `app/routes/transcripts.py` - Serves transcript data and view
+- `app/routes/main.py` - Main application routes
+
+#### Services
+
+- `app/services/batch_transcription_service.py` - Azure Speech Services API integration
+- `app/services/blob_storage.py` - Azure Blob Storage integration
+
+#### Tasks
+
+- `app/tasks/transcription_tasks.py` - Celery task definitions for async processing
+- `app/tasks/celery_app.py` - Celery application configuration
+
+#### Templates
+
+- `app/templates/base.html` - Base template with common layout
+- `app/templates/file_detail.html` - File details view
+- `app/templates/files.html` - File listing dashboard
+- `app/templates/transcript.html` - Interactive transcript viewer
+- `app/templates/upload.html` - File upload interface
+
+#### Static Assets
+
+- `app/static/css/style.css` - Custom CSS styles
+- `app/static/js/main.js` - JavaScript functionality
 
 ## Key Features
 
-- **Asynchronous Processing:** Heavy tasks like transcription are offloaded to Celery workers.
-- **Azure Integration:** Utilizes Azure Blob Storage for file persistence and Azure Speech Services for batch transcription and speaker diarization.
-- **Progress Monitoring:** Both local and Azure upload progress are tracked and displayed.
-- **Audio Processing:** Includes functionality for audio extraction and chunking to prepare files for transcription.
-- **Transcript Stitching:** Combines transcriptions from multiple audio chunks and applies speaker diarization for a coherent final transcript.
+### File Upload
 
-## Project Structure and Key Files
+The application supports large audio file uploads (up to 5GB) with real-time progress tracking. Files are first uploaded to the local server, then transferred to Azure Blob Storage for permanent storage.
 
-- **`app.py`**  
-  The main entry point for the Flask application. It loads environment variables, creates the Flask app using the appropriate configuration, and runs the development server.
+### Transcription Pipeline
 
-- **`celery_worker.py`**  
-  Initializes the Flask application context for Celery, sets up the Celery worker, and ensures that the database session is ready for background tasks.
+1. **Upload**: User uploads an audio file through the web interface
+2. **Storage**: File is stored in Azure Blob Storage
+3. **Processing**: Celery worker submits the file to Azure Speech Service
+4. **Transcription**: Azure processes the audio for speech-to-text and speaker diarization
+5. **Storage**: Resulting transcript is stored in Azure Blob Storage
+6. **Presentation**: Interactive transcript is made available to the user
 
-- **`config.py`**  
-  Contains configuration classes for development, production, and testing. It includes settings for Flask, SQLAlchemy, Azure services, Celery, and file upload limits.
+### Interactive Transcript Viewer
 
-- **`ingest.sh`**  
-  A helper script to ingest project files while excluding unnecessary directories and files (e.g., caches, tests).
+The transcript viewer provides:
 
-- **`requirements.txt`**  
-  Lists all the dependencies required for the project, including Flask, Celery, Azure SDKs, and other Python libraries.
+- Synchronized audio playback with transcript highlighting
+- Word-level confidence indicators (color-coded based on recognition confidence)
+- Speaker identification with color-coded segments
+- Clickable transcript for navigation
+- Playback speed control
+- Keyboard shortcuts for audio control
 
-- **`run_debug.sh`**  
-  A shell script to run the application in debug mode. It checks for required services (e.g., Redis), starts the Celery worker, and then launches the Flask development server.
+## Configuration
 
-- **`setup.py`**  
-  Provides packaging information and dependencies for installing the application as a Python package.
+The application uses environment variables for configuration, stored in a `.env` file. An example configuration is provided in `.env.example`.
 
-- **`.env.example`**  
-  An example environment file that lists the necessary environment variables such as API keys, database URLs, and configuration settings.
+Key configuration options include:
 
-- **`app/` Directory**  
-  Contains the main application modules:
-  - **`__init__.py`**  
-    Initializes the Flask application, sets up the database, registers blueprints, and integrates the Celery instance.
-  - **`models/`**  
-    Contains SQLAlchemy model definitions (e.g., the `File` model) and database initialization logic.
-  - **`routes/`**  
-    Defines the application routes for uploading files, viewing files and transcripts, and API endpoints for progress updates.
-  - **`services/`**  
-    Provides service modules for:
-    - **Audio Processing:** Extracting and chunking audio files.
-    - **Blob Storage:** Handling file uploads/downloads to/from Azure Blob Storage.
-    - **Batch Transcription:** Interfacing with Azure’s batch transcription API.
-    - **Diarization:** Speaker identification using PyAnnote.
-    - **Speech Service:** Transcribing audio files using Azure Speech Services.
-    - **Transcript Stitching:** Merging and applying speaker labels to transcription segments.
-  - **`tasks/`**  
-    Contains Celery task definitions (e.g., the `transcribe_file` task) which orchestrate the transcription workflow.
+- Azure Speech Services API credentials
+- Azure Blob Storage connection details
+- Database connection settings
+- Redis connection for Celery
 
-- **`app/templates/`**  
-  Contains Jinja2 HTML templates for rendering the web pages, including:
-  - `base.html`: The base layout.
-  - `upload.html`: The file upload page.
-  - `files.html` and `file_detail.html`: Pages for listing and detailing uploaded files.
-  - `transcript.html`: Page to view the final transcript.
+## Development Setup
 
-- **`app/static/`**  
-  Contains static assets:
-  - **CSS:** Styling for the application interface.
-  - **JavaScript:** Functionality for file upload progress, audio player controls, and transcript interaction.
+1. Create and activate a virtual environment
+2. Install dependencies: `pip install -r requirements.txt`
+3. Set up environment variables using `.env.example` as a template
+4. Run the development server: `./run_debug.sh`
 
-- **`instance/app.db`**  
-  The SQLite database file used for storing file records and processing metadata.
+## Production Deployment
 
-- **`uploads/`**  
-  Directory where temporary file uploads are stored before being processed and uploaded to Azure Blob Storage.
+For production deployment, consider:
 
-## Setup and Running the Application
-
-1. **Environment Setup:**  
-   - Copy `.env.example` to `.env` and set the necessary environment variables (e.g., `AZURE_SPEECH_KEY`, `AZURE_STORAGE_CONNECTION_STRING`, etc.).
-   - Install the dependencies using:
-     ```bash
-     pip install -r requirements.txt
-     ```
-
-2. **Database Initialization:**  
-   The database is automatically initialized when the application starts. The `instance/app.db` file is created if it does not already exist.
-
-3. **Running in Debug Mode:**  
-   Use the provided shell script to start the application and the Celery worker in debug mode:
-   ```bash
-   ./run_debug.sh
-   ```
-
-4. **Accessing the Application:**  
-   Open your browser and navigate to `http://0.0.0.0:5000/` to access the upload page and start using the application.
-
-## Summary
-
-This Transcription Demo Application provides an end-to-end solution for processing audio files with transcription and speaker diarization. Its modular design, integration with Azure services, and real-time progress tracking make it a robust demo project for applications requiring advanced audio processing and speech-to-text capabilities.
+- Using gunicorn as the WSGI server
+- Setting up a PostgreSQL database
+- Configuring proper Azure permissions
+- Setting up multiple Celery workers for transcription tasks
+- Implementing proper authentication and user management
