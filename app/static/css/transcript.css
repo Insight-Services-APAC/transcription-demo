@@ -73,10 +73,12 @@
     border-radius: 12px;
 }
 
+/* Make sure the inner bar (blue) fills the container */
 .audio-progress {
-    height: 6px;
-    border-radius: 3px;
-    background-color: var(--primary-color);
+    height: 100%;                   
+    border-radius: 0;               
+    background-color: var(--primary-color); 
+    transition: width 0.2s ease-in-out;
 }
 
 .audio-controls .btn {
