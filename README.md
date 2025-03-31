@@ -1,66 +1,131 @@
 # NSWCC Transcription Demo
 
-The NSWCC Transcription Demo is a Flask-based web application that allows users to upload audio files (MP3 or WAV), process them asynchronously, and generate transcriptions with speaker diarization using Azure Speech Services. The application leverages Celery for background task processing, Redis for progress tracking, and Azure Blob Storage to securely store audio files and transcription results.
+NSWCC Transcription Demo is a web-based application designed to upload audio files and process them using Azure Cognitive Services. The application converts speech to text with speaker diarization and provides real-time progress updates during file upload and transcription. Background tasks are handled asynchronously using Celery with Redis, while the frontend is built with Flask, Jinja2 templates, and modern JavaScript.
 
-## Overview
+---
 
-The application provides an intuitive interface for uploading audio files and monitoring the processing pipeline. Once an audio file is uploaded, it is temporarily stored locally and then transferred to Azure Blob Storage via a Celery task. The file is then submitted to the Azure Speech Service Batch Transcription API where the transcription is processed in the background. Users can view real-time upload progress and check on the status of the transcription. When complete, the transcribed text—along with speaker information—is available through the web interface.
+## Features
 
-## Key Features
+- **Audio File Upload:** Supports uploading .MP3 and .WAV files (up to 5GB) via a user-friendly interface.
+- **Asynchronous Processing:** Uses Celery to manage background tasks such as uploading files to Azure Blob Storage and running the transcription pipeline.
+- **Speech-to-Text Transcription:** Leverages Azure Speech Service's Batch Transcription API for converting audio to text with speaker identification.
+- **Real-time Progress Tracking:** Provides dynamic feedback during file upload and transcription using Redis-based progress tracking.
+- **User Authentication:** Includes secure user registration, login, and profile management with Flask-Login.
+- **Robust Error Handling:** Implements custom error classes and middleware for detailed logging and error notifications.
 
-- **File Upload**: Supports .MP3 and .WAV files (up to 5GB) with drag-and-drop functionality.
-- **Asynchronous Processing**: Uses Celery to handle file uploads and transcription tasks in the background.
-- **Progress Tracking**: Real-time monitoring of upload progress and transcription status via Redis and API endpoints.
-- **Azure Integration**:
-  - **Blob Storage**: Securely stores uploaded audio files and transcription results.
-  - **Speech Services**: Converts speech to text and identifies speakers using Azure’s Batch Transcription API.
-- **User Interface**: Provides a dashboard to view file statuses, detailed processing progress, and final transcript output.
+---
 
-## Directory Structure
+## Project Structure
 
 ```
 transcription-demo/
-├── app.py                   -> Main entry point that creates and runs the Flask app.
-├── celery_worker.py         -> Initializes and configures the Celery worker for asynchronous tasks.
-├── config.py                -> Application configuration (database URI, Azure credentials, Celery settings, etc.).
-├── ingest.sh                -> Script for code ingestion, excluding unnecessary files.
-├── requirements.txt         -> List of Python dependencies.
-├── run_debug.sh             -> Debug run script; checks for Redis and starts both Celery and the Flask server.
-├── setup.py                 -> Setup script for packaging the application.
-├── .env.example             -> Example file for environment variable configuration.
-├── app/                     -> Main application package.
-│   ├── __init__.py          -> Initializes the Flask app, registers blueprints, and sets up Celery.
-│   ├── extensions.py        -> Initializes Flask extensions (e.g., SQLAlchemy).
-│   ├── files/               -> Contains file management features:
-│   │   ├── routes.py        -> Routes for file dashboard, details, and API endpoints.
-│   │   ├── uploads.py       -> Handles file upload and storage operations.
-│   │   └── progress.py      -> Provides endpoints to check upload progress.
-│   ├── main/                -> Contains core routes (e.g., index redirection and health checks).
-│   ├── models/              -> Contains database models (e.g., the File model).
-│   ├── services/            -> Implements services to interact with external APIs:
-│   │   ├── blob_storage.py  -> Manages file uploads to and downloads from Azure Blob Storage.
-│   │   └── batch_transcription_service.py -> Integrates with Azure Speech Service for transcription.
-│   ├── tasks/               -> Contains Celery tasks for asynchronous processing:
-│   │   ├── transcription_tasks.py -> Orchestrates the transcription pipeline.
-│   │   └── upload_tasks.py  -> Handles file uploads and triggers transcription.
-│   ├── static/              -> Contains CSS and JavaScript assets for the UI.
-│   ├── templates/           -> Jinja2 templates for rendering web pages.
-│   └── transcripts/         -> Contains routes and logic for viewing and processing transcription results.
-├── instance/                -> Contains instance-specific files (e.g., the SQLite database).
-├── migrations/              -> Alembic migration scripts for managing database schema changes.
-└── uploads/                 -> Temporary storage for uploaded audio files.
+├── app.py                      # Main entry point for the Flask application
+├── celery_worker.py            # Configures and starts the Celery worker for background tasks
+├── config.py                   # Central configuration file (database, Azure, Celery settings)
+├── ingest.sh                   # Script for ingesting files while excluding unwanted directories/files
+├── requirements.txt            # Python dependencies
+├── run_azure_img.sh            # Bash script to build and push the Docker image to Azure Container Registry
+├── run_debug.sh                # Bash script to start the app in debug mode (with Celery and Flask)
+├── setup.py                    # Packaging and distribution configuration
+├── app/                        # Main application package
+│   ├── __init__.py             # Application factory; initializes Flask, extensions, blueprints, and error handling
+│   ├── extensions.py           # Initializes Flask extensions (SQLAlchemy, CSRF, LoginManager)
+│   ├── auth/                   # Authentication blueprint (login, registration, profile)
+│   ├── errors/                 # Custom error handling, logging, and middleware
+│   ├── files/                  # File management (uploads, progress tracking, deletion, and Azure Blob integration)
+│   ├── main/                   # Main blueprint for core routes (index, health check)
+│   ├── models/                 # Database models (User and File)
+│   ├── services/               # Services for Azure Blob Storage and Batch Transcription API interactions
+│   ├── tasks/                  # Celery tasks for transcription and file upload operations
+│   ├── templates/              # Jinja2 HTML templates for the frontend
+│   └── static/                 # Static assets (CSS, JavaScript) for the user interface
+├── instance/                   # Instance-specific files (e.g., the SQLite database)
+├── logs/                       # Log files generated by the application
+├── migrations/                 # Alembic migration scripts for database schema management
+├── uploads/                    # Temporary storage for uploaded audio files
+└── utils/                      # Utility scripts (e.g., remove_jsonify.py for code adjustments)
 ```
-## Application Workflow
 
-1. **File Upload**:  
-   A user uploads an audio file through the web interface. The file is saved temporarily in the `uploads/` directory.
+---
 
-2. **Azure Blob Upload**:  
-   A Celery task (from `upload_tasks.py`) uploads the file to Azure Blob Storage. Progress is tracked via Redis and updated on the client-side.
+## Key Files and Their Roles
 
-3. **Transcription Processing**:  
-   Once the file is uploaded, another Celery task (from `transcription_tasks.py`) submits the file to Azure Speech Service for transcription. The application polls for job status until the transcription succeeds or fails.
+- **app.py:**  
+  Initializes and runs the Flask application using the factory pattern.
 
-4. **Viewing Results**:  
-   When completed, the transcript (and additional metadata such as duration and speaker count) is stored and made available via the web interface. Users can view and download both the audio and the transcription JSON.
+- **celery_worker.py:**  
+  Sets up the Celery worker to execute background tasks such as file uploads and transcription.
+
+- **config.py:**  
+  Loads environment variables and sets configuration options for the database, Azure services, and Celery.
+
+- **run_azure_img.sh & run_debug.sh:**  
+  Bash scripts for building/pushing Docker images to Azure and for running the app in debug mode locally.
+
+- **setup.py:**  
+  Configures the packaging and distribution of the application.
+
+- **app/extensions.py:**  
+  Initializes essential Flask extensions, including SQLAlchemy for ORM, CSRF protection, and Flask-Login for authentication.
+
+- **app/auth/**  
+  Contains routes, forms, and templates for user authentication (login, logout, registration, and profile).
+
+- **app/errors/**  
+  Implements custom exceptions, error handlers, logging, and middleware to ensure robust error processing.
+
+- **app/files/**  
+  Manages file uploads, monitors progress (using Redis and Azure Blob Storage), and handles file deletion.
+
+- **app/models/**  
+  Defines the `User` and `File` data models using SQLAlchemy.
+
+- **app/services/**  
+  Provides service classes to interact with external systems like Azure Blob Storage and the Azure Speech Service for transcription.
+
+- **app/tasks/**  
+  Contains Celery tasks that orchestrate the transcription pipeline and file upload processes.
+
+- **app/templates/**  
+  Includes Jinja2 templates for the application's HTML pages (e.g., home, file details, transcript view, authentication pages, and error pages).
+
+- **app/static/**  
+  Houses CSS and JavaScript files that power the frontend functionality, including file upload management, progress tracking, and transcript rendering.
+
+- **migrations/**  
+  Contains Alembic migration files used for managing database schema changes.
+
+- **utils/remove_jsonify.py:**  
+  A utility script that processes Python files to remove unnecessary `jsonify` calls by transforming the abstract syntax tree.
+
+---
+
+## Running the Application
+
+1. **Setup Environment:**
+   - Install dependencies with:
+     ```bash
+     pip install -r requirements.txt
+     ```
+   - Configure required environment variables (e.g., `FLASK_ENV`, `DATABASE_URL`, `AZURE_STORAGE_CONNECTION_STRING`, `AZURE_SPEECH_KEY`, etc.) using a `.env` file or system environment.
+
+2. **Database Initialization:**
+   - Initialize the database and run migrations using Flask-Migrate and Alembic.
+
+3. **Start the Application:**
+   - For development, you can run:
+     ```bash
+     python app.py
+     ```
+     or use the debug script:
+     ```bash
+     ./run_debug.sh
+     ```
+   - In a separate terminal, start the Celery worker:
+     ```bash
+     celery -A celery_worker.celery worker --loglevel=info
+     ```
+
+4. **Access the Application:**
+   - Open your browser and navigate to `http://localhost:5000` to use the upload and transcription interface.
 
