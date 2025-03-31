@@ -15,10 +15,6 @@ flask_app = create_app(env)
 # Get Celery app from Flask app
 celery = flask_app.celery
 
-# Ensure database session is initialized
-# This explicit import is important to initialize models
-init_db(flask_app)
-
 # Explicitly import task modules to ensure tasks are registered
 import app.tasks.transcription_tasks
 import app.tasks.upload_tasks
