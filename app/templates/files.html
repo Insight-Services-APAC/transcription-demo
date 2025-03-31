@@ -83,23 +83,32 @@
                             </td>
                             <td class="text-end">
                                 <div class="btn-group">
-                                    <a href="{{ url_for('files.file_detail', file_id=file.id) }}" class="btn btn-sm btn-outline-secondary">
+                                    <a href="{{ url_for('files.file_detail', file_id=file.id) }}" class="btn btn-sm btn-outline-secondary" title="View details">
                                         <i class="fas fa-info-circle"></i>
                                     </a>
                                     
                                     {% if file.status == 'uploaded' %}
                                         <form method="POST" action="{{ url_for('files.start_transcription', file_id=file.id) }}" class="d-inline">
-                                            <button type="submit" class="btn btn-sm btn-outline-primary">
+                                            <button type="submit" class="btn btn-sm btn-outline-primary" title="Start transcription">
                                                 <i class="fas fa-play"></i>
                                             </button>
                                         </form>
                                     {% endif %}
                                     
                                     {% if file.status == 'completed' %}
-                                        <a href="{{ url_for('transcripts.view_transcript', file_id=file.id) }}" class="btn btn-sm btn-outline-primary">
+                                        <a href="{{ url_for('transcripts.view_transcript', file_id=file.id) }}" class="btn btn-sm btn-outline-primary" title="View transcript">
                                             <i class="fas fa-file-alt"></i>
                                         </a>
                                     {% endif %}
+                                    
+                                    <button type="button" class="btn btn-sm btn-outline-danger" 
+                                           title="Delete file" 
+                                           data-bs-toggle="modal" 
+                                           data-bs-target="#deleteModal" 
+                                           data-file-id="{{ file.id }}"
+                                           data-file-name="{{ file.filename }}">
+                                        <i class="fas fa-trash-alt"></i>
+                                    </button>
                                 </div>
                             </td>
                         </tr>
@@ -116,6 +125,34 @@
                     {% endfor %}
                 </tbody>
             </table>
+        </div>
+    </div>
+    
+    <!-- Delete Confirmation Modal -->
+    <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="deleteModalLabel">Confirm Deletion</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-warning modal-alert">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <span>This action cannot be undone.</span>
+                    </div>
+                    <p>Are you sure you want to delete <strong id="fileToDelete"></strong>?</p>
+                    <p>This will permanently remove the file and any associated transcription data.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <form id="deleteForm" method="POST" action="">
+                        <button type="submit" class="btn btn-danger">
+                            <i class="fas fa-trash-alt me-2"></i>Delete
+                        </button>
+                    </form>
+                </div>
+            </div>
         </div>
     </div>
 {% else %}
@@ -140,4 +177,5 @@
 
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/file-progress.js') }}"></script>
+<script src="{{ url_for('static', filename='js/delete-modal.js') }}"></script>
 {% endblock %}

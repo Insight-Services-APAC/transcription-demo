@@ -200,6 +200,37 @@ class BlobStorageService:
             download_file.write(download_data.readall())
         return local_path
 
+    def delete_blob(self, blob_path):
+        """
+        Delete a blob from Azure Blob Storage.
+        
+        Args:
+            blob_path (str): path to the blob in storage
+            
+        Returns:
+            bool: True if deletion was successful, False otherwise
+        """
+        try:
+            # Get a blob client for the specified blob
+            blob_client = self.blob_service_client.get_blob_client(
+                container=self.container_name,
+                blob=blob_path
+            )
+            
+            # Check if the blob exists
+            exists = blob_client.exists()
+            if not exists:
+                logger.warning(f"Blob {blob_path} not found, skipping deletion")
+                return False
+                
+            # Delete the blob
+            blob_client.delete_blob()
+            logger.info(f"Successfully deleted blob: {blob_path}")
+            return True
+        except Exception as e:
+            logger.error(f"Error deleting blob {blob_path}: {str(e)}")
+            raise
+
     def upload_bytes(self, data, blob_path, content_type=None):
         """
         Upload in-memory bytes directly to Azure, returning the SAS URL

@@ -3,9 +3,10 @@
  */
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Auto-hide alerts after 5 seconds
+    // Auto-hide alerts after 5 seconds, but exclude the ones in modals
     setTimeout(function() {
-        const alerts = document.querySelectorAll('.alert');
+        // Only select alerts that are not inside modals
+        const alerts = document.querySelectorAll('.alert:not(.modal .alert)');
         alerts.forEach(function(alert) {
             const bsAlert = new bootstrap.Alert(alert);
             bsAlert.close();

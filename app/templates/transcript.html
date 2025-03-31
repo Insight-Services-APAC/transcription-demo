@@ -36,6 +36,11 @@
             <a href="{{ file.transcript_url }}" class="btn btn-outline-light" target="_blank" download>
                 <i class="fas fa-download me-2"></i> JSON
             </a>
+            <button type="button" class="btn btn-outline-danger" 
+                    data-bs-toggle="modal"
+                    data-bs-target="#deleteModal">
+                <i class="fas fa-trash-alt me-2"></i> Delete
+            </button>
         </div>
     </div>
 </div>
@@ -84,10 +89,39 @@
         </audio>
     </div>
 </div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteModalLabel">Confirm Deletion</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning modal-alert">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <span>This action cannot be undone.</span>
+                </div>
+                <p>Are you sure you want to delete <strong>{{ file.filename }}</strong>?</p>
+                <p>This will permanently remove the file and any associated transcription data.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form method="POST" action="{{ url_for('files.delete_file', file_id=file.id) }}">
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-trash-alt me-2"></i>Delete
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/transcript-player.js') }}"></script>
+<script src="{{ url_for('static', filename='js/delete-modal.js') }}"></script>
 <script>
     document.body.dataset.transcriptUrl = "{{ url_for('transcripts.api_transcript', file_id=file.id) }}";
 </script>
