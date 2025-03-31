@@ -47,14 +47,7 @@ def upload():
             except StorageError as e:
                 raise UploadError(f'Storage error: {str(e)}', filename=filename)
             try:
-                file_record = File(
-                    filename=filename, 
-                    blob_url=blob_url, 
-                    status='processing', 
-                    current_stage='queued', 
-                    progress_percent=0.0,
-                    user_id=current_user.id
-                )
+                file_record = File(filename=filename, blob_url=blob_url, status='processing', current_stage='queued', progress_percent=0.0, user_id=current_user.id)
                 db.session.add(file_record)
                 db.session.commit()
             except Exception as e:

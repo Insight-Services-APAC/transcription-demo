@@ -26,12 +26,9 @@ def file_detail(file_id):
     file = db.session.query(File).filter(File.id == file_id).first()
     if file is None:
         raise ResourceNotFoundError(f'File with ID {file_id} not found')
-    
-    # Check if the file belongs to the current user
     if file.user_id != current_user.id:
         flash('You do not have permission to view this file.', 'danger')
         return redirect(url_for('files.file_list'))
-        
     return render_template('file_detail.html', file=file)
 
 @files_bp.route('/transcribe/<file_id>', methods=['POST'])
@@ -41,16 +38,12 @@ def start_transcription(file_id):
     file = db.session.query(File).filter(File.id == file_id).first()
     if file is None:
         raise ResourceNotFoundError(f'File with ID {file_id} not found')
-        
-    # Check if the file belongs to the current user
     if file.user_id != current_user.id:
         flash('You do not have permission to transcribe this file.', 'danger')
         return redirect(url_for('files.file_list'))
-        
     if file.status in ['processing', 'completed']:
         flash(f'File is already {file.status}', 'warning')
         return redirect(url_for('files.file_detail', file_id=file_id))
-        
     file.status = 'processing'
     file.current_stage = 'queued'
     file.progress_percent = 0.0
@@ -66,12 +59,9 @@ def delete_file(file_id):
     file = db.session.query(File).filter(File.id == file_id).first()
     if file is None:
         raise ResourceNotFoundError(f'File with ID {file_id} not found')
-        
-    # Check if the file belongs to the current user
     if file.user_id != current_user.id:
         flash('You do not have permission to delete this file.', 'danger')
         return redirect(url_for('files.file_list'))
-        
     try:
         blob_service = BlobStorageService(connection_string=current_app.config['AZURE_STORAGE_CONNECTION_STRING'], container_name=current_app.config['AZURE_STORAGE_CONTAINER'])
         if file.blob_url:
@@ -107,7 +97,7 @@ def delete_file(file_id):
 
 @files_bp.route('/api/files')
 @login_required
-@csrf.exempt  # Exempt this endpoint from CSRF protection as it's read-only
+@csrf.exempt
 def api_file_list():
     """API endpoint for file list"""
     files = db.session.query(File).filter(File.user_id == current_user.id).order_by(File.upload_time.desc()).all()
@@ -115,15 +105,12 @@ def api_file_list():
 
 @files_bp.route('/api/files/<file_id>')
 @login_required
-@csrf.exempt  # Exempt this endpoint from CSRF protection as it's read-only
+@csrf.exempt
 def api_file_detail(file_id):
     """API endpoint for file details - used for progress updates"""
     file = db.session.query(File).filter(File.id == file_id).first()
     if file is None:
         raise ResourceNotFoundError(f'File with ID {file_id} not found')
-        
-    # Check if the file belongs to the current user
     if file.user_id != current_user.id:
-        return jsonify({'error': 'You do not have permission to view this file.'}), 403
-        
+        return (jsonify({'error': 'You do not have permission to view this file.'}), 403)
     return jsonify(file.to_dict())

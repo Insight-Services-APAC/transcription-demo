@@ -18,19 +18,16 @@ def view_transcript(file_id):
     file = db.session.query(File).filter(File.id == file_id).first()
     if file is None:
         raise ResourceNotFoundError(f'File with ID {file_id} not found')
-        
-    # Check if the file belongs to the current user
     if file.user_id != current_user.id:
         flash('You do not have permission to view this transcript.', 'danger')
         return redirect(url_for('files.file_list'))
-        
     if file.status != 'completed' or not file.transcript_url:
         raise ResourceNotFoundError('Transcript not available for this file', file_id=file_id, status=file.status)
     return render_template('transcript.html', file=file)
 
 @transcripts_bp.route('/api/transcript/<file_id>')
 @login_required
-@csrf.exempt  # Exempt this endpoint from CSRF protection as it's read-only
+@csrf.exempt
 def api_transcript(file_id):
     """
     API endpoint to get transcript data.
@@ -39,11 +36,8 @@ def api_transcript(file_id):
     file = db.session.query(File).filter(File.id == file_id).first()
     if file is None:
         raise ResourceNotFoundError(f'File with ID {file_id} not found')
-        
-    # Check if the file belongs to the current user
     if file.user_id != current_user.id:
-        return jsonify({'error': 'You do not have permission to view this transcript.'}), 403
-        
+        return (jsonify({'error': 'You do not have permission to view this transcript.'}), 403)
     if file.status != 'completed' or not file.transcript_url:
         raise ResourceNotFoundError('Transcript not available for this file', file_id=file_id, status=file.status)
     try:

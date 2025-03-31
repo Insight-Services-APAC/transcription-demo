@@ -6,40 +6,26 @@ from app.models.user import User
 from app.extensions import db
 from datetime import datetime
 import logging
-
 logger = logging.getLogger(__name__)
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
-    # If user is already logged in, redirect to home page
     if current_user.is_authenticated:
         return redirect(url_for('main.index'))
-    
     form = LoginForm()
-    
     if form.validate_on_submit():
-        # Find the user by email or username
-        user = User.query.filter((User.email == form.username.data) | 
-                                (User.username == form.username.data)).first()
-        
-        # Check if user exists and password is correct
+        user = User.query.filter((User.email == form.username.data) | (User.username == form.username.data)).first()
         if user and user.check_password(form.password.data):
             login_user(user, remember=form.remember.data)
-            
-            # Update last login timestamp
             user.last_login = datetime.utcnow()
             db.session.commit()
-            
             logger.info(f'User {user.username} logged in successfully')
             flash('Login successful!', 'success')
-            
-            # Redirect to the next page or home page
             next_page = request.args.get('next')
             return redirect(next_page or url_for('main.index'))
         else:
             logger.warning(f'Failed login attempt for {form.username.data}')
             flash('Invalid username or password', 'danger')
-    
     return render_template('auth/login.html', form=form)
 
 @auth_bp.route('/logout')
@@ -53,35 +39,22 @@ def logout():
 
 @auth_bp.route('/register', methods=['GET', 'POST'])
 def register():
-    # If user is already logged in, redirect to home page
     if current_user.is_authenticated:
         return redirect(url_for('main.index'))
-    
     form = RegistrationForm()
-    
     if form.validate_on_submit():
-        # Check if username or email already exists
         if User.query.filter_by(username=form.username.data).first():
             flash('Username already taken.', 'danger')
             return render_template('auth/register.html', form=form)
-        
         if User.query.filter_by(email=form.email.data).first():
             flash('Email already registered.', 'danger')
             return render_template('auth/register.html', form=form)
-        
-        # Create new user
-        user = User(username=form.username.data,
-                   email=form.email.data,
-                   password=form.password.data)
-        
-        # Add user to database
+        user = User(username=form.username.data, email=form.email.data, password=form.password.data)
         db.session.add(user)
         db.session.commit()
-        
         logger.info(f'New user registered: {user.username}')
         flash('Registration successful! You can now login.', 'success')
         return redirect(url_for('auth.login'))
-    
     return render_template('auth/register.html', form=form)
 
 @auth_bp.route('/profile')

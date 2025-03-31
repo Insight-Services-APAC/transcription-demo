@@ -9,11 +9,10 @@ from celery.result import AsyncResult
 from app.errors.exceptions import ResourceNotFoundError, ServiceError, ValidationError
 from app.errors.logger import log_exception
 from app.extensions import csrf
-
 logger = logging.getLogger(__name__)
 
 @files_bp.route('/upload/progress/<upload_id>')
-@csrf.exempt  # Exempt this endpoint from CSRF protection as it's read-only
+@csrf.exempt
 def upload_progress(upload_id):
     """Get upload progress for a specific upload using Redis-based tracking"""
     try:
@@ -77,7 +76,7 @@ def upload_progress(upload_id):
         return (jsonify({'status': 'error', 'error': f'Server error: {str(e)}'}), 500)
 
 @files_bp.route('/task/status/<task_id>')
-@csrf.exempt  # Exempt this endpoint from CSRF protection as it's read-only
+@csrf.exempt
 def task_status(task_id):
     """Get status of a Celery task by its ID"""
     try:

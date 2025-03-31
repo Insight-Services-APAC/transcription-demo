@@ -8,7 +8,7 @@ def index():
     return redirect(url_for('files.upload'))
 
 @main_bp.route('/health')
-@csrf.exempt  # Exempt health check endpoint from CSRF protection
+@csrf.exempt
 def health():
     """Health check endpoint"""
     return {'status': 'ok'}
