@@ -5,6 +5,13 @@ gitingest . \
   -e "*.pyd" \
   -e ".venv/" \
   -e "venv/" \
+  -e ".env" \
+  -e ".env/" \
+  -e ".env.*" \
+  -e ".envrc" \
+  -e ".bashrc" \
+  -e ".bash_profile" \
+  -e ".profile" \
   -e "test_*.py" \
   -e "*_test.py" \
   -e "tests/" \
