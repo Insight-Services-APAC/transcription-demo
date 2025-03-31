@@ -17,17 +17,21 @@
             <p class="text-muted mb-0 mt-1">
                 <span class="me-3">
                     <i class="far fa-clock me-1"></i>
-                    {% if file.duration_seconds %}{{ file.duration_seconds }}{% else %}Unknown duration{% endif %}
+                    {% if file.duration_seconds %}
+                        {{ file.duration_seconds }}
+                    {% else %}
+                        Unknown duration
+                    {% endif %}
                 </span>
                 {% if file.speaker_count %}
-                <span class="badge bg-info bg-opacity-10 text-info px-3 py-2">
-                    <i class="fas fa-users me-1"></i>{{ file.speaker_count }} speakers
-                </span>
+                    <span class="badge bg-info bg-opacity-10 text-info px-3 py-2">
+                        <i class="fas fa-users me-1"></i>{{ file.speaker_count }} speakers
+                    </span>
                 {% endif %}
             </p>
         </div>
     </div>
-    
+
     <div>
         <div class="btn-group">
             <a href="{{ file.blob_url }}" class="btn btn-outline-light" target="_blank" download>
@@ -36,9 +40,7 @@
             <a href="{{ file.transcript_url }}" class="btn btn-outline-light" target="_blank" download>
                 <i class="fas fa-download me-2"></i> JSON
             </a>
-            <button type="button" class="btn btn-outline-danger" 
-                    data-bs-toggle="modal"
-                    data-bs-target="#deleteModal">
+            <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteModal">
                 <i class="fas fa-trash-alt me-2"></i> Delete
             </button>
         </div>
@@ -54,15 +56,15 @@
             <p class="mt-2">Loading transcript...</p>
         </div>
     </div>
-    
+
     <div id="audio-player" class="p-3">
         <div class="progress mb-3">
             <div id="audio-progress-bar" class="progress-bar audio-progress" role="progressbar" style="width: 0%"></div>
         </div>
-        
+
         <div class="d-flex align-items-center">
             <div id="current-time" class="me-2 text-muted small">0:00</div>
-            
+
             <div class="audio-controls d-flex align-items-center mx-3">
                 <button id="btn-jump-back" class="btn btn-sm btn-outline-light me-2">
                     <i class="fas fa-backward"></i>
@@ -74,15 +76,13 @@
                     <i class="fas fa-forward"></i>
                 </button>
             </div>
-            
+
             <div class="ms-auto d-flex align-items-center">
-                <button id="btn-playback-speed" class="btn btn-sm btn-outline-light">
-                    1.0x
-                </button>
+                <button id="btn-playback-speed" class="btn btn-sm btn-outline-light">1.0x</button>
                 <span id="duration" class="ms-3 text-muted small">0:00</span>
             </div>
         </div>
-        
+
         <audio id="audio-element" class="d-none">
             <source src="{{ file.blob_url }}" type="audio/wav">
             Your browser does not support the audio element.
@@ -94,10 +94,12 @@
 <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
+
             <div class="modal-header">
                 <h5 class="modal-title" id="deleteModalLabel">Confirm Deletion</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
+
             <div class="modal-body">
                 <div class="alert alert-warning modal-alert">
                     <i class="fas fa-exclamation-triangle me-2"></i>
@@ -106,14 +108,17 @@
                 <p>Are you sure you want to delete <strong>{{ file.filename }}</strong>?</p>
                 <p>This will permanently remove the file and any associated transcription data.</p>
             </div>
+
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                 <form method="POST" action="{{ url_for('files.delete_file', file_id=file.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                     <button type="submit" class="btn btn-danger">
                         <i class="fas fa-trash-alt me-2"></i>Delete
                     </button>
                 </form>
             </div>
+
         </div>
     </div>
 </div>
@@ -121,8 +126,8 @@
 
 {% block scripts %}
     <script type="module" src="{{ url_for('static', filename='js/transcript-player/index.js') }}"></script>
-<script src="{{ url_for('static', filename='js/delete-modal.js') }}"></script>
-<script>
-    document.body.dataset.transcriptUrl = "{{ url_for('transcripts.api_transcript', file_id=file.id) }}";
-</script>
+    <script src="{{ url_for('static', filename='js/delete-modal.js') }}"></script>
+    <script>
+        document.body.dataset.transcriptUrl = "{{ url_for('transcripts.api_transcript', file_id=file.id) }}";
+    </script>
 {% endblock %}

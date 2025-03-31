@@ -23,4 +23,32 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     });
+    
+    // Set up CSRF token for AJAX requests
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+    
+    // Set up AJAX requests to include the CSRF token
+    // For fetch API calls
+    window.fetchWithCsrf = function(url, options = {}) {
+        // Create headers if they don't exist
+        if (!options.headers) {
+            options.headers = {};
+        }
+        
+        // Add CSRF token header for non-GET requests
+        if (!options.method || options.method.toUpperCase() !== 'GET') {
+            options.headers['X-CSRFToken'] = csrfToken;
+        }
+        
+        return fetch(url, options);
+    };
+    
+    // For XMLHttpRequest
+    const originalXhrOpen = XMLHttpRequest.prototype.open;
+    XMLHttpRequest.prototype.open = function(method, url) {
+        originalXhrOpen.apply(this, arguments);
+        if (method.toUpperCase() !== 'GET') {
+            this.setRequestHeader('X-CSRFToken', csrfToken);
+        }
+    };
 });

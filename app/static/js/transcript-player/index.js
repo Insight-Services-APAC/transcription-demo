@@ -45,7 +45,7 @@ class TranscriptPlayerApp {
             return Promise.reject(new Error('Transcript URL not found'));
         }
         
-        return fetch(transcriptUrl)
+        return window.fetchWithCsrf(transcriptUrl)
             .then(response => {
                 if (!response.ok) {
                     throw new Error('Failed to load transcript');

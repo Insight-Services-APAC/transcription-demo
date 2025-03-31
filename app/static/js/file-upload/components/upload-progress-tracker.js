@@ -58,7 +58,7 @@ export class UploadProgressTracker {
             // Fetch progress from server
             const progressUrl = this.uploadForm.getAttribute('data-progress-url').replace('UPLOAD_ID_PLACEHOLDER', uploadId);
             
-            fetch(progressUrl)
+            window.fetchWithCsrf(progressUrl)
                 .then(response => response.json())
                 .then(data => {
                     if (data.error) {
@@ -153,7 +153,7 @@ export class UploadProgressTracker {
         this.taskStatusInterval = setInterval(() => {
             const taskStatusUrl = `/task/status/${taskId}`;
             
-            fetch(taskStatusUrl)
+            window.fetchWithCsrf(taskStatusUrl)
                 .then(response => response.json())
                 .then(data => {
                     if (data.state === 'FAILURE') {

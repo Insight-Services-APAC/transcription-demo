@@ -90,6 +90,7 @@ export class FileUploadManager {
             // Open and send the request to the AJAX upload start endpoint
             xhr.open('POST', this.uploadForm.getAttribute('data-start-url'), true);
             xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+            // CSRF token is automatically added by the XHR prototype override in main.js
             xhr.send(formData);
         });
     }

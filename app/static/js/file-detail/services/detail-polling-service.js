@@ -12,7 +12,7 @@ export class DetailPollingService {
         const apiUrl = document.body.dataset.fileApiUrl || `/api/files/${fileId}`;
         
         this.pollInterval = setInterval(() => {
-            fetch(apiUrl)
+            window.fetchWithCsrf(apiUrl)
                 .then(response => response.json())
                 .then(data => {
                     // Update the UI with the latest progress

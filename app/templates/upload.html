@@ -21,6 +21,7 @@
                       data-start-url="{{ url_for('files.start_upload') }}" 
                       data-progress-url="{{ url_for('files.upload_progress', upload_id='UPLOAD_ID_PLACEHOLDER') }}"
                       data-files-url="{{ url_for('files.file_list') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                     <div class="mb-4">
                         <div class="form-file-container p-4 rounded border border-2 border-dashed text-center position-relative">
                             <input class="form-control position-absolute opacity-0 top-0 start-0 w-100 h-100" 
