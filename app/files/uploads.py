@@ -2,6 +2,7 @@ import os
 import uuid
 import time
 from flask import render_template, request, redirect, url_for, flash, current_app, jsonify
+from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 from app.extensions import db
 from app.models.file import File
@@ -14,6 +15,7 @@ from app.errors.logger import log_exception
 logger = logging.getLogger(__name__)
 
 @files_bp.route('/upload', methods=['GET', 'POST'])
+@login_required
 def upload():
     """Upload page for audio files"""
     if request.method == 'POST':
@@ -37,7 +39,7 @@ def upload():
                 except Exception as e:
                     log_exception(e, logger)
                     logger.warning(f'Failed to update progress tracker: {str(e)}')
-                task = upload_to_azure_task.delay(tmp_path, filename, upload_id)
+                task = upload_to_azure_task.delay(tmp_path, filename, upload_id, current_user.id)
                 return jsonify({'upload_id': upload_id, 'task_id': task.id})
             try:
                 blob_service = BlobStorageService(connection_string=current_app.config['AZURE_STORAGE_CONNECTION_STRING'], container_name=current_app.config['AZURE_STORAGE_CONTAINER'])
@@ -45,7 +47,14 @@ def upload():
             except StorageError as e:
                 raise UploadError(f'Storage error: {str(e)}', filename=filename)
             try:
-                file_record = File(filename=filename, blob_url=blob_url, status='processing', current_stage='queued', progress_percent=0.0)
+                file_record = File(
+                    filename=filename, 
+                    blob_url=blob_url, 
+                    status='processing', 
+                    current_stage='queued', 
+                    progress_percent=0.0,
+                    user_id=current_user.id
+                )
                 db.session.add(file_record)
                 db.session.commit()
             except Exception as e:
@@ -82,6 +91,7 @@ def upload():
     return render_template('upload.html')
 
 @files_bp.route('/upload/start', methods=['POST'])
+@login_required
 def start_upload():
     """Handle AJAX upload start"""
     if request.method == 'POST':
@@ -103,7 +113,7 @@ def start_upload():
             except Exception as e:
                 log_exception(e, logger)
                 logger.warning(f'Failed to update progress tracker: {str(e)}')
-            task = upload_to_azure_task.delay(tmp_path, filename, upload_id)
+            task = upload_to_azure_task.delay(tmp_path, filename, upload_id, current_user.id)
             return jsonify({'upload_id': upload_id, 'task_id': task.id})
         except Exception as e:
             log_exception(e, logger)

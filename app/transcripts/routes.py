@@ -1,4 +1,5 @@
-from flask import render_template, jsonify, current_app, request
+from flask import render_template, jsonify, current_app, request, flash, redirect, url_for
+from flask_login import login_required, current_user
 from app.extensions import db, csrf
 from app.models.file import File
 import json
@@ -11,16 +12,24 @@ from app.errors.logger import log_exception
 logger = logging.getLogger(__name__)
 
 @transcripts_bp.route('/transcript/<file_id>')
+@login_required
 def view_transcript(file_id):
     """View transcript page"""
     file = db.session.query(File).filter(File.id == file_id).first()
     if file is None:
         raise ResourceNotFoundError(f'File with ID {file_id} not found')
+        
+    # Check if the file belongs to the current user
+    if file.user_id != current_user.id:
+        flash('You do not have permission to view this transcript.', 'danger')
+        return redirect(url_for('files.file_list'))
+        
     if file.status != 'completed' or not file.transcript_url:
         raise ResourceNotFoundError('Transcript not available for this file', file_id=file_id, status=file.status)
     return render_template('transcript.html', file=file)
 
 @transcripts_bp.route('/api/transcript/<file_id>')
+@login_required
 @csrf.exempt  # Exempt this endpoint from CSRF protection as it's read-only
 def api_transcript(file_id):
     """
@@ -30,6 +39,11 @@ def api_transcript(file_id):
     file = db.session.query(File).filter(File.id == file_id).first()
     if file is None:
         raise ResourceNotFoundError(f'File with ID {file_id} not found')
+        
+    # Check if the file belongs to the current user
+    if file.user_id != current_user.id:
+        return jsonify({'error': 'You do not have permission to view this transcript.'}), 403
+        
     if file.status != 'completed' or not file.transcript_url:
         raise ResourceNotFoundError('Transcript not available for this file', file_id=file_id, status=file.status)
     try:

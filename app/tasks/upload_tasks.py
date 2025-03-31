@@ -65,11 +65,17 @@ class UploadProgressTracker:
         return None
 
 @shared_task(bind=True)
-def upload_to_azure_task(self, file_path, filename, upload_id):
+def upload_to_azure_task(self, file_path, filename, upload_id, user_id=None):
     """
     Celery task to handle file upload to Azure Blob Storage.
+    
+    Args:
+        file_path: Path to the local file
+        filename: Name of the file
+        upload_id: ID for tracking upload progress
+        user_id: ID of the user who uploaded the file
     """
-    logger.info(f'Starting upload task for {filename} (ID: {upload_id})')
+    logger.info(f'Starting upload task for {filename} (ID: {upload_id}, User: {user_id})')
     from flask import current_app
     from app import create_app
     env = os.environ.get('FLASK_ENV', 'development')
@@ -97,7 +103,14 @@ def upload_to_azure_task(self, file_path, filename, upload_id):
                 raise UploadError(f'Storage error during upload: {str(se)}', filename=filename, original_error=str(se))
             try:
                 session = db.session
-                file_record = File(filename=filename, blob_url=blob_url, status='processing', current_stage='queued', progress_percent=0.0)
+                file_record = File(
+                    filename=filename, 
+                    blob_url=blob_url, 
+                    status='processing', 
+                    current_stage='queued', 
+                    progress_percent=0.0,
+                    user_id=user_id
+                )
                 session.add(file_record)
                 session.commit()
             except Exception as e:
