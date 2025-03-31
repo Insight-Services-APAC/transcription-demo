@@ -48,9 +48,12 @@ export class TranscriptRendererComponent {
                 processedText = this.createHighlightedText(segment.words, segment.text);
             }
             
+            // Format timestamp display in a user-friendly way
+            const timestampDisplay = `${segment.start} - ${segment.end}`;
+            
             html += `
                 <div class="speaker-segment speaker-${speakerNum}" data-index="${index}" data-start="${segment.offsetMilliseconds / 1000}" data-end="${(segment.offsetMilliseconds + segment.durationMilliseconds) / 1000}">
-                    <span class="timestamp">${segment.start} - ${segment.end}</span>
+                    <span class="timestamp">${timestampDisplay}</span>
                     <span class="speaker-label">Speaker ${segment.speaker !== undefined ? speakerMap[segment.speaker] : 1}</span>
                     <span class="segment-text">${processedText}</span>
                 </div>

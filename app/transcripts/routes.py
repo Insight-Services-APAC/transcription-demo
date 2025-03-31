@@ -65,26 +65,93 @@ def process_transcript_data(data):
     """Process transcript data into a frontend-friendly format"""
     if not data:
         raise ValidationError('Transcript data is empty or null', field='data')
-    result = {'source': data.get('source', ''), 'duration': data.get('duration', ''), 'combinedResults': [], 'segments': []}
+    
+    result = {
+        'source': data.get('source', ''),
+        'duration': data.get('duration', ''),
+        'combinedResults': [],
+        'segments': []
+    }
+    
     if 'combinedRecognizedPhrases' in data:
-        result['combinedResults'] = [{'channel': item.get('channel', 0), 'text': item.get('display', ''), 'lexical': item.get('lexical', '')} for item in data['combinedRecognizedPhrases']]
+        result['combinedResults'] = [
+            {
+                'channel': item.get('channel', 0),
+                'text': item.get('display', ''),
+                'lexical': item.get('lexical', '')
+            } for item in data['combinedRecognizedPhrases']
+        ]
+    
     if 'recognizedPhrases' in data:
         segments = []
         for phrase in data['recognizedPhrases']:
             if phrase.get('recognitionStatus') != 'Success' or not phrase.get('nBest') or len(phrase['nBest']) == 0:
                 continue
+            
             best_result = phrase['nBest'][0]
-            segment = {'start': phrase.get('offset', '0:00:00'), 'end': add_time_strings(phrase.get('offset', '0:00:00'), phrase.get('duration', '0:00:00')), 'offsetMilliseconds': phrase.get('offsetMilliseconds', 0), 'durationMilliseconds': phrase.get('durationMilliseconds', 0), 'speaker': phrase.get('speaker', 0), 'text': best_result.get('display', ''), 'confidence': best_result.get('confidence', 0), 'words': []}
+            
+            # Convert PT format to user-friendly format
+            offset_str = format_timestamp(phrase.get('offsetMilliseconds', 0))
+            end_offset = phrase.get('offsetMilliseconds', 0) + phrase.get('durationMilliseconds', 0)
+            end_str = format_timestamp(end_offset)
+            
+            segment = {
+                'start': offset_str,
+                'end': end_str,
+                'offsetMilliseconds': phrase.get('offsetMilliseconds', 0),
+                'durationMilliseconds': phrase.get('durationMilliseconds', 0),
+                'speaker': phrase.get('speaker', 0),
+                'text': best_result.get('display', ''),
+                'confidence': best_result.get('confidence', 0),
+                'words': []
+            }
+            
             if 'words' in best_result:
-                segment['words'] = [{'word': word.get('word', ''), 'start': word.get('offset', '0:00:00'), 'duration': word.get('duration', '0:00:00'), 'offsetMilliseconds': word.get('offsetMilliseconds', 0), 'durationMilliseconds': word.get('durationMilliseconds', 0), 'confidence': word.get('confidence', 0)} for word in best_result['words']]
+                segment['words'] = [
+                    {
+                        'word': word.get('word', ''),
+                        'start': format_timestamp(word.get('offsetMilliseconds', 0)),
+                        'duration': format_timestamp_duration(word.get('durationMilliseconds', 0)),
+                        'offsetMilliseconds': word.get('offsetMilliseconds', 0),
+                        'durationMilliseconds': word.get('durationMilliseconds', 0),
+                        'confidence': word.get('confidence', 0)
+                    } for word in best_result['words']
+                ]
+            
             segments.append(segment)
+        
         result['segments'] = sorted(segments, key=lambda x: x['offsetMilliseconds'])
+    
     return result
 
-def add_time_strings(time1, time2):
-    """Add two time strings in HH:MM:SS or HH:MM:SS.msec format"""
+def format_timestamp(milliseconds):
+    """Convert milliseconds to a user-friendly timestamp format (MM:SS.mmm)"""
+    seconds = milliseconds / 1000
+    minutes = int(seconds // 60)
+    seconds_remainder = seconds % 60
+    return f"{minutes:02d}:{seconds_remainder:06.3f}"
 
+def format_timestamp_duration(milliseconds):
+    """Format a duration in milliseconds to a user-friendly format"""
+    seconds = milliseconds / 1000
+    return f"{seconds:.3f}s"
+    
+# Update the add_time_strings function in app/transcripts/routes.py
+def add_time_strings(time1, time2):
+    """
+    Add two time strings in HH:MM:SS, HH:MM:SS.msec, or ISO 8601 duration format (PT1.5S)
+    """
     def to_seconds(time_str):
+        # Handle ISO 8601 duration format (e.g., PT1.5S)
+        if time_str.startswith('PT') and time_str.endswith('S'):
+            # Extract the seconds value between PT and S
+            try:
+                return float(time_str[2:-1])
+            except ValueError:
+                # If conversion fails, return 0
+                return 0
+        
+        # Handle HH:MM:SS or MM:SS format
         parts = time_str.split(':')
         if len(parts) == 3:
             h, m, s = parts
@@ -99,5 +166,6 @@ def add_time_strings(time1, time2):
         m = int(seconds % 3600 // 60)
         s = seconds % 60
         return f'{h:02d}:{m:02d}:{s:06.3f}'
+    
     total_seconds = to_seconds(time1) + to_seconds(time2)
     return to_string(total_seconds)

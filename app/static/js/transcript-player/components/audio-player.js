@@ -30,10 +30,34 @@ export class AudioPlayerComponent {
         this.audioElement.addEventListener('loadedmetadata', this.onMetadataLoaded.bind(this));
         this.audioElement.addEventListener('timeupdate', this.onTimeUpdate.bind(this));
         this.audioElement.addEventListener('ended', this.onAudioEnded.bind(this));
+        
+        // Add a small delay to ensure the audio element has time to load
+        setTimeout(() => {
+            if (this.audioElement.readyState >= 1) {
+                // If the metadata is already loaded, manually call the handler
+                this.onMetadataLoaded();
+            }
+        }, 1000);
+        
+        // Add a fallback to check duration periodically
+        this.durationCheckInterval = setInterval(() => {
+            if (this.audioElement.duration > 0 && this.durationDisplay.textContent === '0:00') {
+                this.onMetadataLoaded();
+            }
+        }, 500);
     }
     
     onMetadataLoaded() {
-        this.durationDisplay.textContent = this.formatTime(this.audioElement.duration);
+        console.log("Audio metadata loaded, duration:", this.audioElement.duration);
+        if (this.audioElement.duration && !isNaN(this.audioElement.duration)) {
+            this.durationDisplay.textContent = this.formatTime(this.audioElement.duration);
+            
+            // Clear the interval once we've successfully loaded the duration
+            if (this.durationCheckInterval) {
+                clearInterval(this.durationCheckInterval);
+                this.durationCheckInterval = null;
+            }
+        }
     }
     
     onTimeUpdate() {
@@ -45,6 +69,11 @@ export class AudioPlayerComponent {
         
         // Update time display
         this.currentTimeDisplay.textContent = this.formatTime(currentTime);
+        
+        // Double-check duration display is updated
+        if (this.durationDisplay.textContent === '0:00' && this.audioElement.duration > 0) {
+            this.durationDisplay.textContent = this.formatTime(this.audioElement.duration);
+        }
         
         // Call registered callbacks
         this.timeUpdateCallbacks.forEach(callback => callback(currentTime));
