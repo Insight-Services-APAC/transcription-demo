@@ -189,7 +189,7 @@
 {% endblock %}
 
 {% block scripts %}
-    <script type="module" src="{{ url_for('static', filename='js/file-detail/index.js') }}"></script>
+<script src="{{ url_for('static', filename='js/file-detail.js') }}"></script>
 <script src="{{ url_for('static', filename='js/delete-modal.js') }}"></script>
 <script>
     document.body.dataset.fileApiUrl = "{{ url_for('files.api_file_detail', file_id=file.id) }}";

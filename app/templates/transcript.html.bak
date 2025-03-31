@@ -120,7 +120,7 @@
 {% endblock %}
 
 {% block scripts %}
-    <script type="module" src="{{ url_for('static', filename='js/transcript-player/index.js') }}"></script>
+<script src="{{ url_for('static', filename='js/transcript-player.js') }}"></script>
 <script src="{{ url_for('static', filename='js/delete-modal.js') }}"></script>
 <script>
     document.body.dataset.transcriptUrl = "{{ url_for('transcripts.api_transcript', file_id=file.id) }}";

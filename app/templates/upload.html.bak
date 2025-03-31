@@ -68,5 +68,5 @@
 {% endblock %}
 
 {% block scripts %}
-    <script type="module" src="{{ url_for('static', filename='js/file-upload/index.js') }}"></script>
+<script src="{{ url_for('static', filename='js/upload.js') }}"></script>
 {% endblock %}
