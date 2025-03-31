@@ -27,10 +27,10 @@ def api_transcript(file_id):
     """
     file = db.session.query(File).filter(File.id == file_id).first()
     if file is None:
-        return jsonify({"error": "File not found"}), 404
+        return {"error": "File not found"}, 404
 
     if file.status != 'completed' or not file.transcript_url:
-        return jsonify({"error": "Transcript not available"}), 404
+        return {"error": "Transcript not available"}, 404
 
     try:
         blob_service = BlobStorageService(

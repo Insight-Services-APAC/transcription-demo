@@ -106,15 +106,15 @@ def start_upload():
     """Handle AJAX upload start"""
     if request.method == 'POST':
         if 'file' not in request.files:
-            return jsonify({'error': 'No file part'})
+            return {'error': 'No file part'}
 
         file = request.files['file']
 
         if file.filename == '':
-            return jsonify({'error': 'No file selected'})
+            return {'error': 'No file selected'}
 
         if not file.filename.lower().endswith(('.mp3', '.wav')):
-            return jsonify({'error': 'Only .MP3 and .WAV files are allowed'})
+            return {'error': 'Only .MP3 and .WAV files are allowed'}
 
         filename = secure_filename(file.filename)
 

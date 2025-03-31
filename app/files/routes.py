@@ -53,5 +53,5 @@ def api_file_detail(file_id):
     """API endpoint for file details - used for progress updates"""
     file = db.session.query(File).filter(File.id == file_id).first()
     if file is None:
-        return jsonify({"error": "File not found"}), 404
+        return {"error": "File not found"}, 404
     return jsonify(file.to_dict())

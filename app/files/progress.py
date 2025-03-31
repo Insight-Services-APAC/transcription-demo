@@ -41,7 +41,7 @@ def upload_progress(upload_id):
             except Exception as e:
                 logger.error(f"Error checking blob service: {str(e)}")
             
-            return jsonify({'status': 'error', 'error': 'Upload not found'})
+            return {'status': 'error', 'error': 'Upload not found'}
             
         # Check different states
         if progress_info.get('status') == 'error':
@@ -57,7 +57,7 @@ def upload_progress(upload_id):
                 except Exception as e:
                     logger.error(f"Error cleaning up temporary file: {str(e)}")
                     
-            return jsonify({'status': 'error', 'error': error_msg})
+            return {'status': 'error', 'error': error_msg}
             
         if progress_info.get('status') == 'completed':
             file_id = progress_info.get('file_id')
@@ -97,7 +97,7 @@ def upload_progress(upload_id):
             
         if progress_info.get('azure_status') == 'pending':
             logger.info(f"Azure upload is pending for {upload_id}")
-            return jsonify({'status': 'uploading', 'progress': 0, 'stage': 'azure_pending'})
+            return {'status': 'uploading', 'progress': 0, 'stage': 'azure_pending'}
             
         # Default response for other states
         return jsonify({
@@ -152,4 +152,4 @@ def task_status(task_id):
         
     except Exception as e:
         logger.error(f"Error in task_status endpoint: {str(e)}")
-        return jsonify({'status': 'error', 'error': str(e)})
+        return {'status': 'error', 'error': str(e)}
