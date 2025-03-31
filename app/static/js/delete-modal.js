@@ -42,11 +42,8 @@ class DeleteModalHandler {
             // Update form action
             const deleteForm = this.deleteModal.querySelector('#deleteForm');
             if (deleteForm) {
-                // Check if the URL contains a placeholder to be replaced
-                const currentAction = deleteForm.getAttribute('action');
-                if (currentAction.includes('FILE_ID_PLACEHOLDER')) {
-                    deleteForm.action = currentAction.replace('FILE_ID_PLACEHOLDER', fileId);
-                }
+                // Set the form action to the correct delete URL
+                deleteForm.action = `/delete/${fileId}`;
             }
         }
         
