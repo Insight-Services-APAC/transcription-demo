@@ -56,6 +56,8 @@ export class FileUploadUIManager {
     }
     
     initDragDropEvents() {
+        if (!this.dropArea) return;
+
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
             this.dropArea.addEventListener(eventName, this.preventDefaults, false);
         });
@@ -80,8 +82,19 @@ export class FileUploadUIManager {
     }
     
     updateFileInfo(file) {
-        this.selectedFileName.textContent = file.name;
-        this.selectedFileSize.textContent = `File size: ${this.formatFileSize(file.size)}`;
+        if (!file) {
+            // Reset UI if no file
+            this.dropArea.classList.remove('has-file');
+            this.dropAreaContent.classList.remove('d-none');
+            this.fileSelectedContent.classList.add('d-none');
+            if (this.selectedFileName) this.selectedFileName.textContent = '';
+            if (this.selectedFileSize) this.selectedFileSize.textContent = '';
+            return;
+        }
+
+        // Update file info and show the selected file view
+        if (this.selectedFileName) this.selectedFileName.textContent = file.name;
+        if (this.selectedFileSize) this.selectedFileSize.textContent = `File size: ${this.formatFileSize(file.size)}`;
         
         this.dropArea.classList.add('has-file');
         this.dropAreaContent.classList.add('d-none');
@@ -101,30 +114,43 @@ export class FileUploadUIManager {
     
     updateProgress(progressData) {
         // Update progress bar
-        this.uploadProgressBar.style.width = progressData.percent + '%';
-        this.uploadPercentage.textContent = progressData.percent + '%';
+        if (this.uploadProgressBar && progressData.percent !== undefined) {
+            this.uploadProgressBar.style.width = progressData.percent + '%';
+        }
+        
+        if (this.uploadPercentage && progressData.percent !== undefined) {
+            this.uploadPercentage.textContent = progressData.percent + '%';
+        }
         
         // Update stage
-        if (progressData.stage) {
+        if (this.currentStage && progressData.stage) {
             this.currentStage.textContent = progressData.stage;
         }
         
         // Update status text
-        if (progressData.statusText) {
+        if (this.uploadStatusText && progressData.statusText) {
             this.uploadStatusText.innerHTML = progressData.statusText;
         }
         
         // Update time remaining
-        if (progressData.timeRemaining !== undefined) {
+        if (this.timeRemaining && progressData.timeRemaining !== undefined) {
             this.timeRemaining.textContent = progressData.timeRemaining;
         }
     }
     
     showError(message) {
-        this.uploadButton.disabled = false;
-        this.uploadButton.innerHTML = '<i class="fas fa-upload me-2"></i>Try Again';
-        this.uploadStatusText.innerHTML = `<small class="text-danger">Error: ${message}</small>`;
-        this.timeRemaining.textContent = 'N/A';
+        if (this.uploadButton) {
+            this.uploadButton.disabled = false;
+            this.uploadButton.innerHTML = '<i class="fas fa-upload me-2"></i>Try Again';
+        }
+        
+        if (this.uploadStatusText) {
+            this.uploadStatusText.innerHTML = `<small class="text-danger">Error: ${message}</small>`;
+        }
+        
+        if (this.timeRemaining) {
+            this.timeRemaining.textContent = 'N/A';
+        }
     }
     
     preventDefaults(e) {
@@ -133,11 +159,13 @@ export class FileUploadUIManager {
     }
     
     highlight() {
-        this.dropArea.classList.add('has-file');
+        if (this.dropArea) {
+            this.dropArea.classList.add('has-file');
+        }
     }
     
     unhighlight() {
-        if (this.fileInput.files.length === 0) {
+        if (this.dropArea && (!this.fileInput || this.fileInput.files.length === 0)) {
             this.dropArea.classList.remove('has-file');
         }
     }
@@ -145,10 +173,15 @@ export class FileUploadUIManager {
     handleDrop(e) {
         const dt = e.dataTransfer;
         const files = dt.files;
-        this.fileInput.files = files;
         
-        const event = new Event('change');
-        this.fileInput.dispatchEvent(event);
+        if (files.length > 0) {
+            this.fileInput.files = files;
+            const event = new Event('change');
+            this.fileInput.dispatchEvent(event);
+        } else {
+            // Reset UI if no valid files were dropped
+            this.updateFileInfo(null);
+        }
     }
     
     formatFileSize(bytes) {
@@ -172,3 +205,4 @@ export class FileUploadUIManager {
             return `${Math.floor(seconds / 3600)} hours ${Math.floor((seconds % 3600) / 60)} minutes`;
         }
     }
+}
