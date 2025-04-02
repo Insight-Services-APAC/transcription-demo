@@ -8,9 +8,6 @@ from datetime import timedelta
 from app.errors.exceptions import ValidationError, ServiceError, TranscriptionError
 from app.errors.logger import log_exception
 
-# Default Whisper model ID (update this value with your actual Whisper model ID if needed)
-DEFAULT_WHISPER_MODEL_ID = "whisper-base"
-
 class BatchTranscriptionService:
     """
     A helper class that aligns with the official 2024-11-15 version of
@@ -28,19 +25,9 @@ class BatchTranscriptionService:
             raise ValidationError('Azure Speech API region is required but was not provided. Check your .env and ensure AZURE_SPEECH_REGION is set.', field='region')
         self.logger.info(f'Initialized BatchTranscriptionService with region: {region}')
 
-    def submit_transcription(self, audio_url, locale='en-US', enable_diarization=True, model_id=None, use_whisper=True):
+    def submit_transcription(self, audio_url, locale='en-US', enable_diarization=True, model_id=None):
         """
         Submit a transcription job using the optional custom/base model if provided.
-        
-        Args:
-            audio_url (str): SAS URL to the audio file in blob storage.
-            locale (str): Language code (e.g., "en-US").
-            enable_diarization (bool): Whether to enable speaker diarization.
-            model_id (str): Optional model ID to use for transcription.
-            use_whisper (bool): If True and no model_id is provided, the default Whisper model is used.
-            
-        Returns:
-            dict: Contains keys 'id' (transcription ID), 'status', and 'location'.
         """
         url = f'{self.base_url}/transcriptions:submit?api-version=2024-11-15'
         if not audio_url:
@@ -62,10 +49,7 @@ class BatchTranscriptionService:
             'displayName': os.path.basename(urlparse(audio_url).path),
             'properties': properties
         }
-        # If use_whisper is True and no model_id is provided, default to the Whisper model.
-        if use_whisper and not model_id:
-            model_id = DEFAULT_WHISPER_MODEL_ID
-        # If a model id is provided (either explicitly or via whisper flag), add it as an entity reference.
+        # If a model id is provided, add it as an entity reference.
         if model_id:
             data["model"] = {
                 "self": f"{self.base_url}/models/{model_id}?api-version=2024-11-15"
@@ -108,7 +92,8 @@ class BatchTranscriptionService:
         GET {base}/transcriptions/{id}?api-version=2024-11-15
 
         Returns:
-            dict: The entire JSON object from the service, including the "status" field.
+            dict with the entire JSON object from the service,
+            including "status" field.
         """
         if not transcription_id:
             raise ValidationError('Transcription ID is required but was not provided.', field='transcription_id')
@@ -135,11 +120,13 @@ class BatchTranscriptionService:
     def get_transcription_result(self, transcription_id):
         """
         Get the actual transcription result JSON (kind=Transcription).
-        - First, GET /transcriptions/{id}?api-version=2024-11-15 to verify status is 'Succeeded'.
-        - Then, GET /transcriptions/{id}/files?api-version=2024-11-15 to find the 'Transcription' file entry and fetch `contentUrl`.
+        - First we do GET /transcriptions/{id}?api-version=2024-11-15
+          to verify status is 'Succeeded'.
+        - Then we do GET /transcriptions/{id}/files?api-version=2024-11-15
+          to find the 'Transcription' file entry and fetch `contentUrl`.
 
         Returns:
-            dict: The complete transcription result JSON.
+            dict containing the entire transcription result JSON.
         """
         if not transcription_id:
             raise ValidationError('Transcription ID is required but was not provided.', field='transcription_id')
@@ -194,11 +181,11 @@ class BatchTranscriptionService:
 
         Args:
             transcription_id (str)
-            polling_interval (int): Interval in seconds between status checks.
-            max_polling_attempts (int): Maximum number of polls before giving up.
+            polling_interval (int): how often (seconds) to check
+            max_polling_attempts (int): give up after N polls
 
         Returns:
-            dict: The final transcription JSON (recognized phrases).
+            dict: The final transcription JSON (the recognized phrases).
         """
         attempts = 0
         while attempts < max_polling_attempts:
