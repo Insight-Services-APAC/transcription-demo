@@ -3,82 +3,7 @@
 {% block title %}User Management - NSWCC Transcription Demo{% endblock %}
 
 {% block stylesheets %}
-<style>
-    html, body {
-        height: 100%;
-    }
-
-    main {
-        min-height: 100%;
-        display: flex;
-        flex-direction: column;
-    }
-
-    .card {
-        flex-grow: 1;
-        display: flex;
-        flex-direction: column;
-    }
-
-    .table-container {
-        flex-grow: 1;
-        overflow-y: auto;
-        overflow-x: auto;
-    }
-
-    .user-table {
-        width: 100%;
-        min-width: 900px;
-        table-layout: fixed;
-    }
-
-    .user-table th, .user-table td {
-        padding: 16px 12px;
-        vertical-align: middle;
-    }
-
-    .user-table tbody tr {
-        border-top: 1px solid #e9ecef;
-    }
-
-    .user-table tbody tr:hover {
-        background-color: rgba(0, 0, 0, 0.01);
-    }
-
-    .user-badges .badge {
-        margin-right: 5px;
-    }
-
-    .dropdown-menu {
-        min-width: 220px;
-    }
-
-    .dropdown-item {
-        padding: 8px 12px;
-        border-radius: 4px;
-    }
-
-    .dropdown-item:hover {
-        background-color: #f8f9fa;
-    }
-
-    /* Column widths */
-    .col-user {
-        width: 35%;
-    }
-
-    .col-email {
-        width: 30%;
-    }
-
-    .col-created {
-        width: 15%;
-    }
-
-    .col-actions {
-        width: 20%;
-    }
-</style>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
 {% endblock %}
 
 {% block content %}
@@ -235,7 +160,7 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <form id="deleteUserForm" method="POST" action="">
+                <form id="deleteUserForm" method="POST" action="" data-url-template="{{ url_for('admin.delete_user', user_id='USER_ID_PLACEHOLDER') }}">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                     <button type="submit" class="btn btn-danger">
                         <i class="fas fa-trash-alt me-2"></i> Delete User
@@ -248,28 +173,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
-    // Set up the delete user modal
-    document.addEventListener('DOMContentLoaded', function () {
-        var deleteUserModal = document.getElementById('deleteUserModal');
-        if (deleteUserModal) {
-            deleteUserModal.addEventListener('show.bs.modal', function (event) {
-                var button = event.relatedTarget;
-                var userId = button.getAttribute('data-user-id');
-                var username = button.getAttribute('data-username');
-
-                var deleteUsername = document.getElementById('deleteUsername');
-                if (deleteUsername) {
-                    deleteUsername.textContent = username;
-                }
-
-                var deleteForm = document.getElementById('deleteUserForm');
-                if (deleteForm) {
-                    // Fix: Use proper URL construction
-                    deleteForm.action = "{{ url_for('admin.delete_user', user_id='USER_ID_PLACEHOLDER') }}".replace('USER_ID_PLACEHOLDER', userId);
-                }
-            });
-        }
-    });
-</script>
+<script src="{{ url_for('static', filename='js/admin/user-modal.js') }}"></script>
 {% endblock %}

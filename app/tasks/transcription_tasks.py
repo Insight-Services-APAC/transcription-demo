@@ -1,3 +1,4 @@
+# app/tasks/transcription_tasks.py
 import os
 import logging
 import time
@@ -97,6 +98,21 @@ def transcribe_file(file_id):
                                 speakers.add(phrase['speaker'])
                         if speakers:
                             file.speaker_count = str(len(speakers))
+                        
+                        # Calculate average accuracy from word confidences
+                        word_confidences = []
+                        for phrase in result_json['recognizedPhrases']:
+                            if phrase.get('recognitionStatus') == 'Success' and phrase.get('nBest') and len(phrase['nBest']) > 0:
+                                best_result = phrase['nBest'][0]
+                                if 'words' in best_result:
+                                    for word in best_result['words']:
+                                        if 'confidence' in word:
+                                            word_confidences.append(word.get('confidence', 0))
+                        
+                        if word_confidences:
+                            avg_accuracy = sum(word_confidences) / len(word_confidences) * 100  # Convert to percentage
+                            file.accuracy_percent = round(avg_accuracy, 2)
+                            logger.info(f'Calculated average accuracy: {file.accuracy_percent}%')
                 except Exception as meta_err:
                     logger.error(f'Metadata extraction error: {str(meta_err)}')
                 db.session.commit()

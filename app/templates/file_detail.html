@@ -1,3 +1,4 @@
+<!-- app/templates/file_detail.html -->
 {% extends "base.html" %}
 
 {% block title %}File Details - {{ file.filename }} - NSWCC Transcription Demo{% endblock %}
@@ -70,6 +71,16 @@
                 <div class="d-flex justify-content-between mb-3">
                     <span class="text-muted">Speakers</span>
                     <span class="badge bg-info bg-opacity-10 text-info px-3 py-2">{{ file.speaker_count }}</span>
+                </div>
+                {% endif %}
+                
+                {% if file.accuracy_percent and file.status == 'completed' %}
+                <div class="d-flex justify-content-between mb-3">
+                    <span class="text-muted">Accuracy</span>
+                    {% set accuracy_class = 'success' if file.accuracy_percent >= 90 else ('warning' if file.accuracy_percent >= 75 else 'danger') %}
+                    <span class="badge bg-{{ accuracy_class }} bg-opacity-10 text-{{ accuracy_class }} px-3 py-2">
+                        {{ file.accuracy_percent|round(1) }}%
+                    </span>
                 </div>
                 {% endif %}
                 

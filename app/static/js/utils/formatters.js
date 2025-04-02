@@ -31,6 +31,23 @@ export function formatTime(seconds) {
 }
 
 /**
+ * Format time in seconds to HH:MM:SS format if hours exist
+ * @param {number} seconds - Time in seconds
+ * @returns {string} Formatted time
+ */
+export function formatTimeExtended(seconds) {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const remainingSeconds = Math.floor(seconds % 60);
+    
+    if (hours > 0) {
+        return `${hours}:${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+    }
+    
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+}
+
+/**
  * Format time remaining in a human-readable way
  * @param {number} seconds - Time in seconds
  * @returns {string} Formatted time remaining
@@ -43,4 +60,37 @@ export function formatTimeRemaining(seconds) {
     } else {
         return `${Math.floor(seconds / 3600)} hours ${Math.floor((seconds % 3600) / 60)} minutes`;
     }
+}
+
+/**
+ * Format a percentage value
+ * @param {number} value - Number to format as percentage
+ * @param {number} decimals - Number of decimal places
+ * @returns {string} Formatted percentage
+ */
+export function formatPercentage(value, decimals = 0) {
+    return `${value.toFixed(decimals)}%`;
+}
+
+/**
+ * Format a date object to a human-readable string
+ * @param {Date} date - Date to format
+ * @param {boolean} includeTime - Whether to include time
+ * @returns {string} Formatted date string
+ */
+export function formatDate(date, includeTime = false) {
+    if (!date) return '';
+    
+    const options = { 
+        year: 'numeric', 
+        month: 'short', 
+        day: 'numeric'
+    };
+    
+    if (includeTime) {
+        options.hour = '2-digit';
+        options.minute = '2-digit';
+    }
+    
+    return new Date(date).toLocaleDateString(undefined, options);
 }

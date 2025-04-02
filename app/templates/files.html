@@ -1,3 +1,4 @@
+<!-- app/templates/files.html -->
 {% extends "base.html" %}
 
 {% block title %}Files Dashboard - NSWCC Transcription Demo{% endblock %}
@@ -20,6 +21,7 @@
                         <th class="border-0 py-3">Upload Time</th>
                         <th class="border-0 py-3">Status</th>
                         <th class="border-0 py-3">Progress</th>
+                        <th class="border-0 py-3">Accuracy</th>
                         <th class="border-0 py-3 text-end">Actions</th>
                     </tr>
                 </thead>
@@ -81,6 +83,18 @@
                                     <span class="text-muted">Not started</span>
                                 {% endif %}
                             </td>
+                            <td>
+                                {% if file.status == 'completed' and file.accuracy_percent %}
+                                    {% set accuracy_class = 'success' if file.accuracy_percent >= 90 else ('warning' if file.accuracy_percent >= 75 else 'danger') %}
+                                    <span class="badge bg-{{ accuracy_class }} bg-opacity-10 text-{{ accuracy_class }} px-3 py-2">
+                                        {{ file.accuracy_percent|round(1) }}%
+                                    </span>
+                                {% elif file.status == 'completed' %}
+                                    <span class="text-muted">Not available</span>
+                                {% else %}
+                                    <span class="text-muted">--</span>
+                                {% endif %}
+                            </td>
                             <td class="text-end">
                                 <div class="btn-group">
                                     <a href="{{ url_for('files.file_detail', file_id=file.id) }}" class="btn btn-sm btn-outline-secondary" title="View details">
@@ -116,7 +130,7 @@
                         
                         {% if file.status == 'error' and file.error_message %}
                             <tr>
-                                <td colspan="5" class="border-0 pt-0">
+                                <td colspan="6" class="border-0 pt-0">
                                     <div class="alert alert-danger alert-sm mb-0 mt-2">
                                         <strong>Error:</strong> {{ file.error_message }}
                                     </div>
