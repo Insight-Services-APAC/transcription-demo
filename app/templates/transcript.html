@@ -24,8 +24,13 @@
                     {% endif %}
                 </span>
                 {% if file.speaker_count %}
-                    <span class="badge bg-info bg-opacity-10 text-info px-3 py-2">
+                    <span class="badge bg-info bg-opacity-10 text-info px-3 py-2 me-2">
                         <i class="fas fa-users me-1"></i>{{ file.speaker_count }} speakers
+                    </span>
+                {% endif %}
+                {% if file.model_name %}
+                    <span class="badge bg-primary bg-opacity-10 text-primary px-3 py-2">
+                        <i class="fas fa-microphone-alt me-1"></i>{{ file.model_name }}
                     </span>
                 {% endif %}
             </p>

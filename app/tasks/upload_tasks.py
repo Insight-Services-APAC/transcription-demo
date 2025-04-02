@@ -2,6 +2,7 @@ import os
 import time
 import logging
 import traceback
+import uuid
 from celery import shared_task
 from flask import current_app
 from app.extensions import db
@@ -65,17 +66,19 @@ class UploadProgressTracker:
         return None
 
 @shared_task(bind=True)
-def upload_to_azure_task(self, file_path, filename, upload_id, user_id=None):
+def upload_to_azure_task(self, tmp_path, filename, upload_id, user_id=None, model_id=None, model_name=None):
     """
     Celery task to handle file upload to Azure Blob Storage.
     
     Args:
-        file_path: Path to the local file
+        tmp_path: Path to the local file
         filename: Name of the file
         upload_id: ID for tracking upload progress
         user_id: ID of the user who uploaded the file
+        model_id: Optional ID of the model to use for transcription
+        model_name: Optional name of the model to use for transcription
     """
-    logger.info(f'Starting upload task for {filename} (ID: {upload_id}, User: {user_id})')
+    logger.info(f'Starting upload task for {filename} (ID: {upload_id}, User: {user_id}, Model: {model_id})')
     from flask import current_app
     from app import create_app
     env = os.environ.get('FLASK_ENV', 'development')
@@ -83,32 +86,64 @@ def upload_to_azure_task(self, file_path, filename, upload_id, user_id=None):
     with app.app_context():
         progress_tracker = UploadProgressTracker(app)
         try:
-            progress_tracker.update_progress(upload_id, {'status': 'starting', 'progress': 0, 'file_path': file_path, 'filename': filename, 'azure_status': 'pending', 'stage': 'preparing'})
+            progress_data = {
+                'status': 'starting', 
+                'progress': 0, 
+                'file_path': tmp_path, 
+                'filename': filename, 
+                'azure_status': 'pending', 
+                'stage': 'preparing',
+                'start_time': time.time()
+            }
+            
+            # Add model information if provided
+            if model_id:
+                progress_data['model_id'] = model_id
+                progress_data['model_name'] = model_name
+                
+            progress_tracker.update_progress(upload_id, progress_data)
         except Exception as e:
             logger.error(f'Error updating progress tracker: {str(e)}')
         try:
-            if not os.path.exists(file_path):
-                raise UploadError(f'File not found at path: {file_path}', filename=filename)
-            file_size = os.path.getsize(file_path)
+            if not os.path.exists(tmp_path):
+                raise UploadError(f'File not found at path: {tmp_path}', filename=filename)
+            file_size = os.path.getsize(tmp_path)
             if file_size == 0:
                 raise UploadError(f'File is empty (0 bytes)', filename=filename)
             try:
-                progress_tracker.update_progress(upload_id, {'status': 'uploading', 'progress': 0, 'file_path': file_path, 'filename': filename, 'azure_status': 'in_progress', 'stage': 'azure_upload', 'start_time': time.time(), 'file_size': file_size})
+                progress_tracker.update_progress(upload_id, {'status': 'uploading', 'progress': 0, 'file_path': tmp_path, 'filename': filename, 'azure_status': 'in_progress', 'stage': 'azure_upload', 'start_time': time.time(), 'file_size': file_size})
             except Exception as e:
                 logger.error(f'Error updating progress tracker: {str(e)}')
             try:
                 blob_service = BlobStorageService(connection_string=app.config['AZURE_STORAGE_CONNECTION_STRING'], container_name=app.config['AZURE_STORAGE_CONTAINER'])
-                blob_url = blob_service.upload_file(file_path, filename, upload_id, progress_tracker)
+                blob_url = blob_service.upload_file(tmp_path, filename, upload_id, progress_tracker)
             except StorageError as se:
                 raise UploadError(f'Storage error during upload: {str(se)}', filename=filename, original_error=str(se))
             try:
                 session = db.session
-                file_record = File(filename=filename, blob_url=blob_url, status='processing', current_stage='queued', progress_percent=0.0, user_id=user_id)
+                
+                # Create file record with model information if provided
+                file_record = File(
+                    filename=filename, 
+                    blob_url=blob_url, 
+                    status='processing', 
+                    current_stage='queued', 
+                    progress_percent=0.0, 
+                    user_id=user_id,
+                    model_id=model_id,
+                    model_name=model_name
+                )
+                
                 session.add(file_record)
                 session.commit()
             except Exception as e:
                 log_exception(e, logger)
                 raise DatabaseError(f'Database error creating file record: {str(e)}', filename=filename)
+            try:
+                os.remove(tmp_path)
+                logger.info(f'Removed temporary file: {tmp_path}')
+            except Exception as e:
+                logger.error(f'Error removing temporary file: {str(e)}')
             try:
                 from app.tasks.transcription_tasks import transcribe_file
                 transcribe_result = transcribe_file.delay(file_record.id)
@@ -119,12 +154,6 @@ def upload_to_azure_task(self, file_path, filename, upload_id, user_id=None):
                 progress_tracker.update_progress(upload_id, {'status': 'completed', 'progress': 100, 'azure_status': 'completed', 'file_id': file_record.id, 'transcription_task_id': transcribe_result.id})
             except Exception as e:
                 logger.error(f'Error updating progress tracker: {str(e)}')
-            try:
-                if os.path.exists(file_path):
-                    os.remove(file_path)
-                    logger.info(f'Removed temporary file: {file_path}')
-            except Exception as e:
-                logger.error(f'Error removing temporary file: {str(e)}')
             return {'status': 'success', 'file_id': file_record.id, 'progress': 100}
         except UploadError as ue:
             log_exception(ue, logger)
@@ -132,10 +161,10 @@ def upload_to_azure_task(self, file_path, filename, upload_id, user_id=None):
                 progress_tracker.update_progress(upload_id, {'status': 'error', 'azure_status': 'error', 'error': str(ue)})
             except:
                 pass
-            if file_path and os.path.exists(file_path):
+            if tmp_path and os.path.exists(tmp_path):
                 try:
-                    os.remove(file_path)
-                    logger.info(f'Cleaned up temporary file after error: {file_path}')
+                    os.remove(tmp_path)
+                    logger.info(f'Cleaned up temporary file after error: {tmp_path}')
                 except Exception as cleanup_error:
                     logger.error(f'Error cleaning up temporary file: {str(cleanup_error)}')
             return {'status': 'error', 'error': str(ue), 'code': ue.error_code, 'filename': filename}
@@ -145,10 +174,10 @@ def upload_to_azure_task(self, file_path, filename, upload_id, user_id=None):
                 progress_tracker.update_progress(upload_id, {'status': 'error', 'azure_status': 'error', 'error': str(e)})
             except:
                 pass
-            if file_path and os.path.exists(file_path):
+            if tmp_path and os.path.exists(tmp_path):
                 try:
-                    os.remove(file_path)
-                    logger.info(f'Cleaned up temporary file after error: {file_path}')
+                    os.remove(tmp_path)
+                    logger.info(f'Cleaned up temporary file after error: {tmp_path}')
                 except Exception as cleanup_error:
                     logger.error(f'Error cleaning up temporary file: {str(cleanup_error)}')
             return {'status': 'error', 'error': str(e), 'code': e.error_code, 'filename': filename}
@@ -159,10 +188,10 @@ def upload_to_azure_task(self, file_path, filename, upload_id, user_id=None):
                 progress_tracker.update_progress(upload_id, {'status': 'error', 'azure_status': 'error', 'error': str(e)})
             except:
                 pass
-            if file_path and os.path.exists(file_path):
+            if tmp_path and os.path.exists(tmp_path):
                 try:
-                    os.remove(file_path)
-                    logger.info(f'Cleaned up temporary file after error: {file_path}')
+                    os.remove(tmp_path)
+                    logger.info(f'Cleaned up temporary file after error: {tmp_path}')
                 except Exception as cleanup_error:
                     logger.error(f'Error cleaning up temporary file: {str(cleanup_error)}')
             return {'status': 'error', 'error': f'Unexpected error: {str(e)}', 'filename': filename}

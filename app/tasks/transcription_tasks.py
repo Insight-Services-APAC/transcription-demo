@@ -55,9 +55,26 @@ def transcribe_file(file_id):
         region = current_app.config['AZURE_SPEECH_REGION']
         if not subscription_key or not region:
             raise TranscriptionError('Missing Azure Speech API configuration. Check AZURE_SPEECH_KEY and AZURE_SPEECH_REGION.', service='azure_speech')
+        
         transcription_service = BatchTranscriptionService(subscription_key, region)
+        
+        # Check if a specific model is requested
+        model_id = file.model_id
+        if model_id:
+            logger.info(f'Using specified model: {model_id} ({file.model_name or "unknown"})')
+        else:
+            logger.info('Using default model (no specific model requested)')
+        
         logger.info(f'Submitting batch transcription for blob: {file.blob_url}')
-        result_job = transcription_service.submit_transcription(audio_url=file.blob_url, locale='en-US', enable_diarization=True)
+        
+        # Pass the model_id to the transcription service if provided
+        result_job = transcription_service.submit_transcription(
+            audio_url=file.blob_url, 
+            locale='en-US', 
+            enable_diarization=True,
+            model_id=model_id
+        )
+        
         transcription_id = result_job['id']
         file.transcription_id = transcription_id
         db.session.commit()

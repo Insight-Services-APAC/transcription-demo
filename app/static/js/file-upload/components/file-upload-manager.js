@@ -87,6 +87,19 @@ export class FileUploadManager {
                 reject(new Error('Network error occurred'));
             });
             
+            // Capture model selection
+            const modelSelect = document.getElementById('transcription_model');
+            if (modelSelect && modelSelect.value) {
+                // Add the model information to the form data
+                formData.append('model_id', modelSelect.value);
+                
+                // Also add the model name if available
+                const selectedOption = modelSelect.options[modelSelect.selectedIndex];
+                if (selectedOption && selectedOption.dataset.name) {
+                    formData.append('model_name', selectedOption.dataset.name);
+                }
+            }
+            
             // Open and send the request to the AJAX upload start endpoint
             xhr.open('POST', this.uploadForm.getAttribute('data-start-url'), true);
             xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');

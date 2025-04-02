@@ -8,6 +8,9 @@ from datetime import timedelta
 from app.errors.exceptions import ValidationError, ServiceError, TranscriptionError
 from app.errors.logger import log_exception
 
+# Default Whisper model ID (update this value with your actual Whisper model ID if needed)
+DEFAULT_WHISPER_MODEL_ID = "whisper-base"
+
 class BatchTranscriptionService:
     """
     A helper class that aligns with the official 2024-11-15 version of
@@ -25,17 +28,19 @@ class BatchTranscriptionService:
             raise ValidationError('Azure Speech API region is required but was not provided. Check your .env and ensure AZURE_SPEECH_REGION is set.', field='region')
         self.logger.info(f'Initialized BatchTranscriptionService with region: {region}')
 
-    def submit_transcription(self, audio_url, locale='en-US', enable_diarization=True):
+    def submit_transcription(self, audio_url, locale='en-US', enable_diarization=True, model_id=None, use_whisper=True):
         """
-        Submit a transcription job to the Azure Speech Service (API version 2024-11-15).
-
+        Submit a transcription job using the optional custom/base model if provided.
+        
         Args:
-            audio_url (str): SAS URL to the audio file in blob storage
-            locale (str): Language code (e.g., "en-US")
-            enable_diarization (bool): Whether to enable speaker diarization
-
+            audio_url (str): SAS URL to the audio file in blob storage.
+            locale (str): Language code (e.g., "en-US").
+            enable_diarization (bool): Whether to enable speaker diarization.
+            model_id (str): Optional model ID to use for transcription.
+            use_whisper (bool): If True and no model_id is provided, the default Whisper model is used.
+            
         Returns:
-            dict with keys: 'id' (transcription ID), 'status', 'location'
+            dict: Contains keys 'id' (transcription ID), 'status', and 'location'.
         """
         url = f'{self.base_url}/transcriptions:submit?api-version=2024-11-15'
         if not audio_url:
@@ -43,9 +48,32 @@ class BatchTranscriptionService:
         parsed_url = urlparse(audio_url)
         if not parsed_url.scheme or not parsed_url.netloc:
             raise ValidationError(f'Invalid audio URL format: {audio_url}', field='audio_url')
-        properties = {'timeToLiveHours': '12', 'diarization': {'enabled': enable_diarization}, 'wordLevelTimestampsEnabled': True, 'displayFormWordLevelTimestampsEnabled': True, 'punctuationMode': 'DictatedAndAutomatic', 'profanityFilterMode': 'Masked'}
-        data = {'contentUrls': [audio_url], 'locale': locale, 'displayName': os.path.basename(urlparse(audio_url).path), 'properties': properties}
-        headers = {'Ocp-Apim-Subscription-Key': self.subscription_key, 'Content-Type': 'application/json'}
+        properties = {
+            'timeToLiveHours': '12',
+            'diarization': {'enabled': enable_diarization},
+            'wordLevelTimestampsEnabled': True,
+            'displayFormWordLevelTimestampsEnabled': True,
+            'punctuationMode': 'DictatedAndAutomatic',
+            'profanityFilterMode': 'Masked'
+        }
+        data = {
+            'contentUrls': [audio_url],
+            'locale': locale,
+            'displayName': os.path.basename(urlparse(audio_url).path),
+            'properties': properties
+        }
+        # If use_whisper is True and no model_id is provided, default to the Whisper model.
+        if use_whisper and not model_id:
+            model_id = DEFAULT_WHISPER_MODEL_ID
+        # If a model id is provided (either explicitly or via whisper flag), add it as an entity reference.
+        if model_id:
+            data["model"] = {
+                "self": f"{self.base_url}/models/{model_id}?api-version=2024-11-15"
+            }
+        headers = {
+            'Ocp-Apim-Subscription-Key': self.subscription_key,
+            'Content-Type': 'application/json'
+        }
         self.logger.info(f'Submitting transcription request to: {url}')
         self.logger.debug(f'Request payload: {json.dumps(data, indent=2)}')
         try:
@@ -80,8 +108,7 @@ class BatchTranscriptionService:
         GET {base}/transcriptions/{id}?api-version=2024-11-15
 
         Returns:
-            dict with the entire JSON object from the service,
-            including "status" field.
+            dict: The entire JSON object from the service, including the "status" field.
         """
         if not transcription_id:
             raise ValidationError('Transcription ID is required but was not provided.', field='transcription_id')
@@ -108,13 +135,11 @@ class BatchTranscriptionService:
     def get_transcription_result(self, transcription_id):
         """
         Get the actual transcription result JSON (kind=Transcription).
-        - First we do GET /transcriptions/{id}?api-version=2024-11-15
-          to verify status is 'Succeeded'.
-        - Then we do GET /transcriptions/{id}/files?api-version=2024-11-15
-          to find the 'Transcription' file entry and fetch `contentUrl`.
+        - First, GET /transcriptions/{id}?api-version=2024-11-15 to verify status is 'Succeeded'.
+        - Then, GET /transcriptions/{id}/files?api-version=2024-11-15 to find the 'Transcription' file entry and fetch `contentUrl`.
 
         Returns:
-            dict containing the entire transcription result JSON.
+            dict: The complete transcription result JSON.
         """
         if not transcription_id:
             raise ValidationError('Transcription ID is required but was not provided.', field='transcription_id')
@@ -169,11 +194,11 @@ class BatchTranscriptionService:
 
         Args:
             transcription_id (str)
-            polling_interval (int): how often (seconds) to check
-            max_polling_attempts (int): give up after N polls
+            polling_interval (int): Interval in seconds between status checks.
+            max_polling_attempts (int): Maximum number of polls before giving up.
 
         Returns:
-            dict: The final transcription JSON (the recognized phrases).
+            dict: The final transcription JSON (recognized phrases).
         """
         attempts = 0
         while attempts < max_polling_attempts:
@@ -189,3 +214,26 @@ class BatchTranscriptionService:
             attempts += 1
             time.sleep(polling_interval)
         raise TranscriptionError(f'Transcription {transcription_id} did not complete after {max_polling_attempts} attempts.', service='azure_speech', transcription_id=transcription_id, max_attempts=max_polling_attempts)
+
+    def list_models(self, model_type="base"):
+        """
+        Retrieve available models of the specified type (e.g., "base" or "custom")
+        using the 2024-11-15 API version.
+        """
+        url = f"{self.base_url}/models/{model_type}?api-version=2024-11-15"
+        self.logger.info(f"Retrieving {model_type} models from: {url}")
+        headers = {'Ocp-Apim-Subscription-Key': self.subscription_key}
+        try:
+            response = requests.get(url, headers=headers, timeout=60)
+            if response.status_code != 200:
+                try:
+                    error_content = response.json()
+                except json.JSONDecodeError:
+                    error_content = response.text
+                raise TranscriptionError(f'Azure Speech API error retrieving models ({response.status_code}): {error_content}', service='azure_speech', status_code=response.status_code)
+            models = response.json()  # Expected to be a JSON object listing models.
+            self.logger.info(f"Retrieved {len(models.get('values', []))} models.")
+            return models
+        except requests.exceptions.RequestException as e:
+            log_exception(e, self.logger)
+            raise TranscriptionError(f'Network error retrieving models: {str(e)}', service='azure_speech')

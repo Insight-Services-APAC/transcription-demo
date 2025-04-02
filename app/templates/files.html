@@ -21,6 +21,7 @@
                         <th class="border-0 py-3">Upload Time</th>
                         <th class="border-0 py-3">Status</th>
                         <th class="border-0 py-3">Progress</th>
+                        <th class="border-0 py-3">Model</th>
                         <th class="border-0 py-3">Accuracy</th>
                         <th class="border-0 py-3 text-end">Actions</th>
                     </tr>
@@ -54,7 +55,7 @@
                                     <span class="badge bg-danger bg-opacity-10 text-danger px-3 py-2">Error</span>
                                 {% endif %}
                             </td>
-                            <td class="progress-cell" style="width: 30%;">
+                            <td class="progress-cell" style="width: 20%;">
                                 {% if file.status == 'processing' %}
                                     <div class="d-flex flex-column">
                                         <div class="d-flex justify-content-between mb-1">
@@ -81,6 +82,15 @@
                                     <span class="text-success">Complete</span>
                                 {% else %}
                                     <span class="text-muted">Not started</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if file.model_name %}
+                                    <span class="badge bg-primary bg-opacity-10 text-primary px-3 py-2">
+                                        {{ file.model_name }}
+                                    </span>
+                                {% else %}
+                                    <span class="text-muted">Default</span>
                                 {% endif %}
                             </td>
                             <td>
@@ -130,7 +140,7 @@
                         
                         {% if file.status == 'error' and file.error_message %}
                             <tr>
-                                <td colspan="6" class="border-0 pt-0">
+                                <td colspan="7" class="border-0 pt-0">
                                     <div class="alert alert-danger alert-sm mb-0 mt-2">
                                         <strong>Error:</strong> {{ file.error_message }}
                                     </div>
