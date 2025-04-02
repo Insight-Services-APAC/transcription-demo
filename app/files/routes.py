@@ -10,10 +10,12 @@ from app.files import files_bp
 from app.tasks.transcription_tasks import transcribe_file
 from app.services.blob_storage import BlobStorageService
 from app.errors.exceptions import ResourceNotFoundError, ServiceError, StorageError, ValidationError
+from app.auth.decorators import approval_required
 logger = logging.getLogger(__name__)
 
 @files_bp.route('/files')
 @login_required
+@approval_required
 def file_list():
     """Dashboard of all files for the current user"""
     files = db.session.query(File).filter(File.user_id == current_user.id).order_by(File.upload_time.desc()).all()
@@ -21,6 +23,7 @@ def file_list():
 
 @files_bp.route('/files/<file_id>')
 @login_required
+@approval_required
 def file_detail(file_id):
     """File detail page"""
     file = db.session.query(File).filter(File.id == file_id).first()
@@ -33,6 +36,7 @@ def file_detail(file_id):
 
 @files_bp.route('/transcribe/<file_id>', methods=['POST'])
 @login_required
+@approval_required
 def start_transcription(file_id):
     """Start transcription process for a file"""
     file = db.session.query(File).filter(File.id == file_id).first()
@@ -54,6 +58,7 @@ def start_transcription(file_id):
 
 @files_bp.route('/delete/<file_id>', methods=['POST'])
 @login_required
+@approval_required
 def delete_file(file_id):
     """Delete file and associated resources"""
     file = db.session.query(File).filter(File.id == file_id).first()
@@ -97,6 +102,7 @@ def delete_file(file_id):
 
 @files_bp.route('/api/files')
 @login_required
+@approval_required
 @csrf.exempt
 def api_file_list():
     """API endpoint for file list"""
@@ -105,6 +111,7 @@ def api_file_list():
 
 @files_bp.route('/api/files/<file_id>')
 @login_required
+@approval_required
 @csrf.exempt
 def api_file_detail(file_id):
     """API endpoint for file details - used for progress updates"""

@@ -12,10 +12,12 @@ from app.tasks.upload_tasks import upload_to_azure_task, UploadProgressTracker
 import logging
 from app.errors.exceptions import ValidationError, UploadError, StorageError, DatabaseError
 from app.errors.logger import log_exception
+from app.auth.decorators import approval_required
 logger = logging.getLogger(__name__)
 
 @files_bp.route('/upload', methods=['GET', 'POST'])
 @login_required
+@approval_required
 def upload():
     """Upload page for audio files"""
     if request.method == 'POST':
@@ -85,6 +87,7 @@ def upload():
 
 @files_bp.route('/upload/start', methods=['POST'])
 @login_required
+@approval_required
 def start_upload():
     """Handle AJAX upload start"""
     if request.method == 'POST':

@@ -9,10 +9,12 @@ import logging
 from app.transcripts import transcripts_bp
 from app.errors.exceptions import ResourceNotFoundError, ValidationError, ServiceError, StorageError
 from app.errors.logger import log_exception
+from app.auth.decorators import approval_required
 logger = logging.getLogger(__name__)
 
 @transcripts_bp.route('/transcript/<file_id>')
 @login_required
+@approval_required
 def view_transcript(file_id):
     """View transcript page"""
     file = db.session.query(File).filter(File.id == file_id).first()
@@ -27,6 +29,7 @@ def view_transcript(file_id):
 
 @transcripts_bp.route('/api/transcript/<file_id>')
 @login_required
+@approval_required
 @csrf.exempt
 def api_transcript(file_id):
     """
@@ -136,7 +139,6 @@ def format_timestamp_duration(milliseconds):
     seconds = milliseconds / 1000
     return f"{seconds:.3f}s"
     
-# Update the add_time_strings function in app/transcripts/routes.py
 def add_time_strings(time1, time2):
     """
     Add two time strings in HH:MM:SS, HH:MM:SS.msec, or ISO 8601 duration format (PT1.5S)

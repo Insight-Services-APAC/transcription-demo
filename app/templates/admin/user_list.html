@@ -1,0 +1,275 @@
+{% extends "base.html" %}
+
+{% block title %}User Management - NSWCC Transcription Demo{% endblock %}
+
+{% block stylesheets %}
+<style>
+    html, body {
+        height: 100%;
+    }
+
+    main {
+        min-height: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .card {
+        flex-grow: 1;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .table-container {
+        flex-grow: 1;
+        overflow-y: auto;
+        overflow-x: auto;
+    }
+
+    .user-table {
+        width: 100%;
+        min-width: 900px;
+        table-layout: fixed;
+    }
+
+    .user-table th, .user-table td {
+        padding: 16px 12px;
+        vertical-align: middle;
+    }
+
+    .user-table tbody tr {
+        border-top: 1px solid #e9ecef;
+    }
+
+    .user-table tbody tr:hover {
+        background-color: rgba(0, 0, 0, 0.01);
+    }
+
+    .user-badges .badge {
+        margin-right: 5px;
+    }
+
+    .dropdown-menu {
+        min-width: 220px;
+    }
+
+    .dropdown-item {
+        padding: 8px 12px;
+        border-radius: 4px;
+    }
+
+    .dropdown-item:hover {
+        background-color: #f8f9fa;
+    }
+
+    /* Column widths */
+    .col-user {
+        width: 35%;
+    }
+
+    .col-email {
+        width: 30%;
+    }
+
+    .col-created {
+        width: 15%;
+    }
+
+    .col-actions {
+        width: 20%;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="d-flex align-items-center">
+        <a href="{{ url_for('admin.dashboard') }}" class="btn btn-icon btn-light me-3">
+            <i class="fas fa-arrow-left"></i>
+        </a>
+        <h2 class="fw-bold mb-0">User Management</h2>
+    </div>
+    
+    <a href="{{ url_for('admin.create_user') }}" class="btn btn-primary">
+        <i class="fas fa-user-plus me-2"></i> Add New User
+    </a>
+</div>
+
+<div class="card">
+    <div class="table-container">
+        <table class="user-table">
+            <thead>
+                <tr>
+                    <th class="col-user">User</th>
+                    <th class="col-email">Email</th>
+                    <th class="col-created">Created</th>
+                    <th class="col-actions text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                <tr>
+                    <td class="col-user">
+                        <div class="d-flex align-items-center">
+                            <div class="bg-{{ 'primary' if user.is_admin else 'secondary' }} bg-opacity-10 p-2 rounded me-3">
+                                <i class="fas fa-{{ 'user-shield' if user.is_admin else 'user' }} text-{{ 'primary' if user.is_admin else 'secondary' }}"></i>
+                            </div>
+                            <div>
+                                <div class="fw-medium">{{ user.username }}</div>
+                                <div class="user-badges">
+                                    {% if user.is_admin %}
+                                        <span class="badge bg-primary bg-opacity-10 text-primary">Admin</span>
+                                    {% endif %}
+                                    {% if not user.is_approved and not user.is_admin %}
+                                        <span class="badge bg-danger bg-opacity-10 text-danger">Pending</span>
+                                    {% endif %}
+                                    {% if user.is_temporary_password %}
+                                        <span class="badge bg-warning bg-opacity-10 text-warning" title="User has not changed their temporary password">Temp Password</span>
+                                    {% endif %}
+                                    {% if not user.is_active %}
+                                        <span class="badge bg-secondary bg-opacity-10 text-secondary">Inactive</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="col-email">{{ user.email }}</td>
+                    <td class="col-created">{{ user.created_at.strftime('%Y-%m-%d') }}</td>
+                    <td class="col-actions text-end">
+                        {% if current_user.id != user.id %}
+                        <div class="dropdown">
+                            <button class="btn btn-outline-secondary dropdown-toggle" type="button" id="dropdownMenuButton-{{ user.id }}" data-bs-toggle="dropdown" aria-expanded="false">
+                                Actions
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="dropdownMenuButton-{{ user.id }}">
+                                <li>
+                                    <form method="POST" action="{{ url_for('admin.toggle_admin', user_id=user.id) }}">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                        <button type="submit" class="dropdown-item">
+                                            {% if user.is_admin %}
+                                                <i class="fas fa-user me-2 text-warning"></i> Remove Admin
+                                            {% else %}
+                                                <i class="fas fa-user-shield me-2 text-primary"></i> Make Admin
+                                            {% endif %}
+                                        </button>
+                                    </form>
+                                </li>
+                                <li>
+                                    <form method="POST" action="{{ url_for('admin.toggle_active', user_id=user.id) }}">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                        <button type="submit" class="dropdown-item">
+                                            {% if user.is_active %}
+                                                <i class="fas fa-user-slash me-2 text-danger"></i> Deactivate
+                                            {% else %}
+                                                <i class="fas fa-user-check me-2 text-success"></i> Activate
+                                            {% endif %}
+                                        </button>
+                                    </form>
+                                </li>
+                                {% if not user.is_admin %}
+                                <li>
+                                    <form method="POST" action="{{ url_for('admin.toggle_approval', user_id=user.id) }}">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                        <button type="submit" class="dropdown-item">
+                                            {% if user.is_approved %}
+                                                <i class="fas fa-user-times me-2 text-danger"></i> Revoke Access
+                                            {% else %}
+                                                <i class="fas fa-user-check me-2 text-success"></i> Approve Access
+                                            {% endif %}
+                                        </button>
+                                    </form>
+                                </li>
+                                {% endif %}
+                                <li>
+                                    <form method="POST" action="{{ url_for('admin.reset_password', user_id=user.id) }}">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                        <button type="submit" class="dropdown-item">
+                                            <i class="fas fa-key me-2 text-warning"></i> Reset Password
+                                        </button>
+                                    </form>
+                                </li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                    <button type="button" class="dropdown-item text-danger" 
+                                        data-bs-toggle="modal" 
+                                        data-bs-target="#deleteUserModal"
+                                        data-user-id="{{ user.id }}"
+                                        data-username="{{ user.username }}">
+                                        <i class="fas fa-trash-alt me-2"></i> Delete User
+                                    </button>
+                                </li>
+                            </ul>
+                        </div>
+                        {% else %}
+                        <span class="badge bg-light text-secondary border">Your Account</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if not users %}
+    <div class="alert alert-info m-3">
+        <i class="fas fa-info-circle me-2"></i>
+        <span>No users found. Create a new user to get started.</span>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Delete User Modal -->
+<div class="modal fade" id="deleteUserModal" tabindex="-1" aria-labelledby="deleteUserModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteUserModalLabel">Confirm User Deletion</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <span>This action cannot be undone. All user data, including files and transcriptions, will be deleted.</span>
+                </div>
+                <p>Are you sure you want to delete user <strong id="deleteUsername"></strong>?</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form id="deleteUserForm" method="POST" action="">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-trash-alt me-2"></i> Delete User
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Set up the delete user modal
+    document.addEventListener('DOMContentLoaded', function () {
+        var deleteUserModal = document.getElementById('deleteUserModal');
+        if (deleteUserModal) {
+            deleteUserModal.addEventListener('show.bs.modal', function (event) {
+                var button = event.relatedTarget;
+                var userId = button.getAttribute('data-user-id');
+                var username = button.getAttribute('data-username');
+
+                var deleteUsername = document.getElementById('deleteUsername');
+                if (deleteUsername) {
+                    deleteUsername.textContent = username;
+                }
+
+                var deleteForm = document.getElementById('deleteUserForm');
+                if (deleteForm) {
+                    // Fix: Use proper URL construction
+                    deleteForm.action = "{{ url_for('admin.delete_user', user_id='USER_ID_PLACEHOLDER') }}".replace('USER_ID_PLACEHOLDER', userId);
+                }
+            });
+        }
+    });
+</script>
+{% endblock %}

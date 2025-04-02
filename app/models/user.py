@@ -12,12 +12,19 @@ class User(db.Model, UserMixin):
     password_hash = db.Column(db.String(256), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime, nullable=True)
+    is_temporary_password = db.Column(db.Boolean, default=True)
+    is_admin = db.Column(db.Boolean, default=False)
+    is_active = db.Column(db.Boolean, default=True)
+    is_approved = db.Column(db.Boolean, default=False)
     files = db.relationship('File', backref='owner', lazy='dynamic')
 
-    def __init__(self, username, email, password):
+    def __init__(self, username, email, password, is_admin=False, is_temporary_password=False, is_approved=False):
         self.username = username
         self.email = email
         self.set_password(password)
+        self.is_admin = is_admin
+        self.is_temporary_password = is_temporary_password
+        self.is_approved = is_approved
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
