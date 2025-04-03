@@ -8,7 +8,7 @@
  * @returns {HTMLElement|null} DOM element or null if not found
  */
 export function getElement(id) {
-    return document.getElementById(id);
+  return document.getElementById(id);
 }
 
 /**
@@ -18,20 +18,20 @@ export function getElement(id) {
  * @param {string|HTMLElement} content - Element content
  * @returns {HTMLElement} Created element
  */
-export function createElement(tag, attributes = {}, content = '') {
-    const element = document.createElement(tag);
-    
-    Object.entries(attributes).forEach(([key, value]) => {
-        element.setAttribute(key, value);
-    });
-    
-    if (typeof content === 'string') {
-        element.innerHTML = content;
-    } else if (content instanceof HTMLElement) {
-        element.appendChild(content);
-    }
-    
-    return element;
+export function createElement(tag, attributes = {}, content = "") {
+  const element = document.createElement(tag);
+
+  Object.entries(attributes).forEach(([key, value]) => {
+    element.setAttribute(key, value);
+  });
+
+  if (typeof content === "string") {
+    element.innerHTML = content;
+  } else if (content instanceof HTMLElement) {
+    element.appendChild(content);
+  }
+
+  return element;
 }
 
 /**
@@ -39,6 +39,6 @@ export function createElement(tag, attributes = {}, content = '') {
  * @param {Event} e - DOM event
  */
 export function preventDefaults(e) {
-    e.preventDefault();
-    e.stopPropagation();
+  e.preventDefault();
+  e.stopPropagation();
 }

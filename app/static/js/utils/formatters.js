@@ -8,15 +8,15 @@
  * @returns {string} Formatted file size
  */
 export function formatFileSize(bytes) {
-    if (bytes < 1024) {
-        return bytes + ' bytes';
-    } else if (bytes < 1024 * 1024) {
-        return (bytes / 1024).toFixed(2) + ' KB';
-    } else if (bytes < 1024 * 1024 * 1024) {
-        return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
-    } else {
-        return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
-    }
+  if (bytes < 1024) {
+    return bytes + " bytes";
+  } else if (bytes < 1024 * 1024) {
+    return (bytes / 1024).toFixed(2) + " KB";
+  } else if (bytes < 1024 * 1024 * 1024) {
+    return (bytes / (1024 * 1024)).toFixed(2) + " MB";
+  } else {
+    return (bytes / (1024 * 1024 * 1024)).toFixed(2) + " GB";
+  }
 }
 
 /**
@@ -25,9 +25,9 @@ export function formatFileSize(bytes) {
  * @returns {string} Formatted time
  */
 export function formatTime(seconds) {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = Math.floor(seconds % 60);
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = Math.floor(seconds % 60);
+  return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
 }
 
 /**
@@ -36,15 +36,15 @@ export function formatTime(seconds) {
  * @returns {string} Formatted time
  */
 export function formatTimeExtended(seconds) {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const remainingSeconds = Math.floor(seconds % 60);
-    
-    if (hours > 0) {
-        return `${hours}:${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
-    }
-    
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const remainingSeconds = Math.floor(seconds % 60);
+
+  if (hours > 0) {
+    return `${hours}:${minutes.toString().padStart(2, "0")}:${remainingSeconds.toString().padStart(2, "0")}`;
+  }
+
+  return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
 }
 
 /**
@@ -53,13 +53,13 @@ export function formatTimeExtended(seconds) {
  * @returns {string} Formatted time remaining
  */
 export function formatTimeRemaining(seconds) {
-    if (seconds < 60) {
-        return `${Math.round(seconds)} seconds`;
-    } else if (seconds < 3600) {
-        return `${Math.floor(seconds / 60)} minutes ${Math.round(seconds % 60)} seconds`;
-    } else {
-        return `${Math.floor(seconds / 3600)} hours ${Math.floor((seconds % 3600) / 60)} minutes`;
-    }
+  if (seconds < 60) {
+    return `${Math.round(seconds)} seconds`;
+  } else if (seconds < 3600) {
+    return `${Math.floor(seconds / 60)} minutes ${Math.round(seconds % 60)} seconds`;
+  } else {
+    return `${Math.floor(seconds / 3600)} hours ${Math.floor((seconds % 3600) / 60)} minutes`;
+  }
 }
 
 /**
@@ -69,7 +69,7 @@ export function formatTimeRemaining(seconds) {
  * @returns {string} Formatted percentage
  */
 export function formatPercentage(value, decimals = 0) {
-    return `${value.toFixed(decimals)}%`;
+  return `${value.toFixed(decimals)}%`;
 }
 
 /**
@@ -79,18 +79,18 @@ export function formatPercentage(value, decimals = 0) {
  * @returns {string} Formatted date string
  */
 export function formatDate(date, includeTime = false) {
-    if (!date) return '';
-    
-    const options = { 
-        year: 'numeric', 
-        month: 'short', 
-        day: 'numeric'
-    };
-    
-    if (includeTime) {
-        options.hour = '2-digit';
-        options.minute = '2-digit';
-    }
-    
-    return new Date(date).toLocaleDateString(undefined, options);
+  if (!date) return "";
+
+  const options = {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  };
+
+  if (includeTime) {
+    options.hour = "2-digit";
+    options.minute = "2-digit";
+  }
+
+  return new Date(date).toLocaleDateString(undefined, options);
 }

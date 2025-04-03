@@ -8,12 +8,12 @@
  * @returns {Object} Standardized error object
  */
 const defaultErrorHandler = (error) => {
-    console.error('API request failed:', error);
-    return {
-        success: false,
-        error: error.message || 'An unknown error occurred',
-        status: error.status || 500
-    };
+  console.error("API request failed:", error);
+  return {
+    success: false,
+    error: error.message || "An unknown error occurred",
+    status: error.status || 500,
+  };
 };
 
 /**
@@ -23,29 +23,29 @@ const defaultErrorHandler = (error) => {
  * @returns {Promise<any>} Response data as JSON
  */
 export async function fetchData(url, options = {}) {
-    try {
-        const response = await fetch(url, {
-            method: 'GET',
-            headers: {
-                'Accept': 'application/json',
-                ...options.headers
-            },
-            ...options
-        });
-        
-        if (!response.ok) {
-            throw {
-                message: `HTTP error! Status: ${response.status}`,
-                status: response.status
-            };
-        }
-        
-        return await response.json();
-    } catch (error) {
-        return options.errorHandler ? 
-            options.errorHandler(error) : 
-            defaultErrorHandler(error);
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        ...options.headers,
+      },
+      ...options,
+    });
+
+    if (!response.ok) {
+      throw {
+        message: `HTTP error! Status: ${response.status}`,
+        status: response.status,
+      };
     }
+
+    return await response.json();
+  } catch (error) {
+    return options.errorHandler
+      ? options.errorHandler(error)
+      : defaultErrorHandler(error);
+  }
 }
 
 /**
@@ -56,34 +56,36 @@ export async function fetchData(url, options = {}) {
  * @returns {Promise<any>} Response data as JSON
  */
 export async function postData(url, data, options = {}) {
-    try {
-        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-        
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                ...(csrfToken ? { 'X-CSRFToken': csrfToken } : {}),
-                ...options.headers
-            },
-            body: JSON.stringify(data),
-            ...options
-        });
-        
-        if (!response.ok) {
-            throw {
-                message: `HTTP error! Status: ${response.status}`,
-                status: response.status
-            };
-        }
-        
-        return await response.json();
-    } catch (error) {
-        return options.errorHandler ? 
-            options.errorHandler(error) : 
-            defaultErrorHandler(error);
+  try {
+    const csrfToken = document
+      .querySelector('meta[name="csrf-token"]')
+      ?.getAttribute("content");
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        ...(csrfToken ? { "X-CSRFToken": csrfToken } : {}),
+        ...options.headers,
+      },
+      body: JSON.stringify(data),
+      ...options,
+    });
+
+    if (!response.ok) {
+      throw {
+        message: `HTTP error! Status: ${response.status}`,
+        status: response.status,
+      };
     }
+
+    return await response.json();
+  } catch (error) {
+    return options.errorHandler
+      ? options.errorHandler(error)
+      : defaultErrorHandler(error);
+  }
 }
 
 /**
@@ -94,33 +96,35 @@ export async function postData(url, data, options = {}) {
  * @returns {Promise<any>} Response data as JSON
  */
 export async function postFormData(url, formData, options = {}) {
-    try {
-        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-        
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: {
-                'Accept': 'application/json',
-                ...(csrfToken ? { 'X-CSRFToken': csrfToken } : {}),
-                ...options.headers
-            },
-            body: formData,
-            ...options
-        });
-        
-        if (!response.ok) {
-            throw {
-                message: `HTTP error! Status: ${response.status}`,
-                status: response.status
-            };
-        }
-        
-        return await response.json();
-    } catch (error) {
-        return options.errorHandler ? 
-            options.errorHandler(error) : 
-            defaultErrorHandler(error);
+  try {
+    const csrfToken = document
+      .querySelector('meta[name="csrf-token"]')
+      ?.getAttribute("content");
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        ...(csrfToken ? { "X-CSRFToken": csrfToken } : {}),
+        ...options.headers,
+      },
+      body: formData,
+      ...options,
+    });
+
+    if (!response.ok) {
+      throw {
+        message: `HTTP error! Status: ${response.status}`,
+        status: response.status,
+      };
     }
+
+    return await response.json();
+  } catch (error) {
+    return options.errorHandler
+      ? options.errorHandler(error)
+      : defaultErrorHandler(error);
+  }
 }
 
 /**
@@ -130,15 +134,17 @@ export async function postFormData(url, formData, options = {}) {
  * @returns {Promise<Response>} Fetch response
  */
 export function fetchWithCsrf(url, options = {}) {
-    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-    
-    // Only add CSRF token for non-GET requests
-    if (!options.method || options.method.toUpperCase() !== 'GET') {
-        options.headers = {
-            ...options.headers,
-            'X-CSRFToken': csrfToken
-        };
-    }
-    
-    return fetch(url, options);
+  const csrfToken = document
+    .querySelector('meta[name="csrf-token"]')
+    ?.getAttribute("content");
+
+  // Only add CSRF token for non-GET requests
+  if (!options.method || options.method.toUpperCase() !== "GET") {
+    options.headers = {
+      ...options.headers,
+      "X-CSRFToken": csrfToken,
+    };
+  }
+
+  return fetch(url, options);
 }
