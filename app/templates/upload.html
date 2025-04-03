@@ -1,101 +1,117 @@
 {% extends "base.html" %}
-
 {% block title %}Upload Audio File - NSWCC Transcription Demo{% endblock %}
-
 {% block stylesheets %}
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/upload.css') }}">
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='css/upload.css') }}">
 {% endblock %}
-
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-lg-8">
-        <div class="card">
-            <div class="card-body p-4">
-                <h2 class="card-title fw-bold mb-4">Upload Audio File</h2>
-
-                <div class="alert alert-light border-start border-4 border-primary mb-4">
-                    <p class="mb-0">Upload a .MP3 or .WAV file (up to 5GB) for transcription and speaker diarization.</p>
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-body p-4">
+                    <h2 class="card-title fw-bold mb-4">Upload Audio File</h2>
+                    <div class="alert alert-light border-start border-4 border-primary mb-4">
+                        <p class="mb-0">Upload a .MP3 or .WAV file (up to 5GB) for transcription and speaker diarization.</p>
+                    </div>
+                    <form method="POST"
+                          action="{{ url_for('files.upload') }}"
+                          enctype="multipart/form-data"
+                          id="uploadForm"
+                          data-start-url="{{ url_for('files.start_upload') }}"
+                          data-progress-url="{{ url_for('files.upload_progress', upload_id='UPLOAD_ID_PLACEHOLDER') }}"
+                          data-files-url="{{ url_for('files.file_list') }}"
+                          data-models-url="{{ url_for('files.api_models') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                        <div class="mb-4">
+                            <div class="form-file-container p-4 rounded border border-2 border-dashed text-center position-relative">
+                                <input class="form-control position-absolute opacity-0 top-0 start-0 w-100 h-100"
+                                       id="file"
+                                       name="file"
+                                       type="file"
+                                       accept=".mp3,.wav"
+                                       required>
+                                <div class="py-5" id="dropAreaContent">
+                                    <i class="fas fa-cloud-upload-alt fa-3x text-primary mb-3"></i>
+                                    <h5>Drop your audio file here</h5>
+                                    <p class="text-muted mb-0">or click to browse</p>
+                                </div>
+                                <div class="py-5 d-none" id="fileSelectedContent">
+                                    <i class="fas fa-file-audio fa-3x text-success mb-3"></i>
+                                    <h5 id="selectedFileName">File selected</h5>
+                                    <p class="text-muted mb-0">Click upload to start processing</p>
+                                    <p class="text-muted file-size mt-2" id="selectedFileSize"></p>
+                                </div>
+                            </div>
+                            <div class="form-text mt-2">Only .MP3 and .WAV format files are accepted.</div>
+                        </div>
+                        <div class="mb-4">
+                            <label for="transcription_model" class="form-label">Transcription Model</label>
+                            <select class="form-select"
+                                    id="transcription_model"
+                                    name="transcription_model"
+                                    aria-describedby="modelHelp">
+                                <option value="">-- Default Model --</option>
+                            </select>
+                            <input type="hidden" id="model_locale" name="model_locale" value="">
+                            <div id="modelLoadingIndicator" class="d-none mt-2">
+                                <div class="spinner-border spinner-border-sm text-primary me-2"
+                                     role="status">
+                                    <span class="visually-hidden">Loading models...</span>
+                                </div>
+                                <span>Loading available models...</span>
+                            </div>
+                            <div id="modelHelp" class="form-text">
+                                <small>
+                                    Select a model or use the default (an OpenAI model called <strong>Whisper</strong>).
+                                </small>
+                                <p class="mt-2 mb-1">
+                                    <strong>General Characteristics:</strong>
+                                </p>
+                                <ul class="mb-2">
+                                    <li>
+                                        <strong>Unified:</strong> Newer, general-purpose models suitable for various scenarios.
+                                    </li>
+                                    <li>
+                                        <strong>Conversational:</strong> Optimized for multi-speaker audio like meetings or calls.
+                                    </li>
+                                    <li>
+                                        <strong>Interactive:</strong> Best for commands or short utterances.
+                                    </li>
+                                    <li>
+                                        <strong>Custom:</strong> Trained with your own data for specific use cases.
+                                    </li>
+                                </ul>
+                                <em>Performance may vary depending on the model version and the audio content.</em>
+                            </div>
+                        </div>
+                        <div class="progress mb-3 d-none" id="uploadProgressContainer">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
+                                 id="uploadProgressBar"
+                                 role="progressbar"
+                                 style="width: 0%"></div>
+                        </div>
+                        <div id="uploadStatusText" class="text-center mb-3 d-none">
+                            <small class="text-muted">Preparing upload... <span id="uploadPercentage">0%</span></small>
+                        </div>
+                        <div id="uploadStageText" class="text-center mb-3 d-none">
+                            <small class="text-muted">Stage: <span id="currentStage">Local upload</span></small>
+                        </div>
+                        <div id="uploadTimeRemaining" class="text-center mb-3 d-none">
+                            <small class="text-muted">Estimated time remaining: <span id="timeRemaining">Calculating...</span></small>
+                        </div>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary py-2" id="uploadButton">
+                                <i class="fas fa-upload me-2"></i>Upload File
+                            </button>
+                        </div>
+                    </form>
                 </div>
-
-                <form method="POST" action="{{ url_for('files.upload') }}" enctype="multipart/form-data" id="uploadForm"
-                      data-start-url="{{ url_for('files.start_upload') }}"
-                      data-progress-url="{{ url_for('files.upload_progress', upload_id='UPLOAD_ID_PLACEHOLDER') }}"
-                      data-files-url="{{ url_for('files.file_list') }}"
-                      data-models-url="{{ url_for('files.api_models') }}">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                    <div class="mb-4">
-                        <div class="form-file-container p-4 rounded border border-2 border-dashed text-center position-relative">
-                            <input class="form-control position-absolute opacity-0 top-0 start-0 w-100 h-100"
-                                   id="file" name="file" type="file" accept=".mp3,.wav" required>
-                            <div class="py-5" id="dropAreaContent">
-                                <i class="fas fa-cloud-upload-alt fa-3x text-primary mb-3"></i>
-                                <h5>Drop your audio file here</h5>
-                                <p class="text-muted mb-0">or click to browse</p>
-                            </div>
-                            <div class="py-5 d-none" id="fileSelectedContent">
-                                <i class="fas fa-file-audio fa-3x text-success mb-3"></i>
-                                <h5 id="selectedFileName">File selected</h5>
-                                <p class="text-muted mb-0">Click upload to start processing</p>
-                                <p class="text-muted file-size mt-2" id="selectedFileSize"></p>
-                            </div>
-                        </div>
-                        <div class="form-text mt-2">Only .MP3 and .WAV format files are accepted.</div>
-                    </div>
-
-                    <div class="mb-4">
-                        <label for="transcription_model" class="form-label">Transcription Model</label>
-                        <select class="form-select" id="transcription_model" name="transcription_model" aria-describedby="modelHelp">
-                            <option value="">-- Default Model --</option>
-                        </select>
-                        <input type="hidden" id="model_locale" name="model_locale" value="">
-                        <div id="modelLoadingIndicator" class="d-none mt-2">
-                            <div class="spinner-border spinner-border-sm text-primary me-2" role="status">
-                                <span class="visually-hidden">Loading models...</span>
-                            </div>
-                            <span>Loading available models...</span>
-                        </div>
-                        <div id="modelHelp" class="form-text">
-                            <small>
-                                Select a model or use the default (an OpenAI model called <strong>Whisper</strong>).
-                            </small>
-                            <p class="mt-2 mb-1"><strong>General Characteristics:</strong></p>
-                            <ul class="mb-2">
-                                <li><strong>Unified:</strong> Newer, general-purpose models suitable for various scenarios.</li>
-                                <li><strong>Conversational:</strong> Optimized for multi-speaker audio like meetings or calls.</li>
-                                <li><strong>Interactive:</strong> Best for commands or short utterances.</li>
-                                <li><strong>Custom:</strong> Trained with your own data for specific use cases.</li>
-                            </ul>
-                            <em>Performance may vary depending on the model version and the audio content.</em>
-                        </div>
-                    </div>
-
-                    <div class="progress mb-3 d-none" id="uploadProgressContainer">
-                        <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
-                             id="uploadProgressBar" role="progressbar" style="width: 0%"></div>
-                    </div>
-                    <div id="uploadStatusText" class="text-center mb-3 d-none">
-                        <small class="text-muted">Preparing upload... <span id="uploadPercentage">0%</span></small>
-                    </div>
-                    <div id="uploadStageText" class="text-center mb-3 d-none">
-                        <small class="text-muted">Stage: <span id="currentStage">Local upload</span></small>
-                    </div>
-                    <div id="uploadTimeRemaining" class="text-center mb-3 d-none">
-                        <small class="text-muted">Estimated time remaining: <span id="timeRemaining">Calculating...</span></small>
-                    </div>
-
-                    <div class="d-grid">
-                        <button type="submit" class="btn btn-primary py-2" id="uploadButton">
-                            <i class="fas fa-upload me-2"></i>Upload File
-                        </button>
-                    </div>
-                </form>
             </div>
         </div>
     </div>
-</div>
 {% endblock %}
-
 {% block scripts %}
-<script type="module" src="{{ url_for('static', filename='js/file-upload/index.js') }}"></script>
-<script src="{{ url_for('static', filename='js/file-upload/model-loader.js') }}"></script>
+    <script type="module"
+            src="{{ url_for('static', filename='js/file-upload/index.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/file-upload/model-loader.js') }}"></script>
 {% endblock %}
