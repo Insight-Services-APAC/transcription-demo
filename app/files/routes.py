@@ -332,8 +332,8 @@ def upload():
 
                 base_models = service.list_models(model_type="base").get("values", [])
                 for model in base_models:
-                    if model.get("id") == model_id:
-                        model_name = model.get("name")
+                    if model.get("self") == model_id:  # Changed from "id" to "self"
+                        model_name = model.get("displayName")  # Changed from "name" to "displayName"
                         break
 
                 # If not found, check custom models
@@ -342,8 +342,8 @@ def upload():
                         "values", []
                     )
                     for model in custom_models:
-                        if model.get("id") == model_id:
-                            model_name = model.get("name")
+                        if model.get("self") == model_id:  # Changed from "id" to "self"
+                            model_name = model.get("displayName")  # Changed from "name" to "displayName"
                             break
             except Exception as e:
                 logger.warning(f"Error fetching model name: {str(e)}")
@@ -455,35 +455,7 @@ def upload():
             log_exception(e, logger)
             flash(f"Unexpected error: {str(e)}", "danger")
             return redirect(request.url)
-
-    # Try to fetch models for initial page load
-    models = []
-    try:
-        subscription_key = current_app.config["AZURE_SPEECH_KEY"]
-        region = current_app.config["AZURE_SPEECH_REGION"]
-        service = BatchTranscriptionService(subscription_key, region)
-
-        # First fetch base models
-        base_models_response = service.list_models(model_type="base")
-        base_models = base_models_response.get("values", [])
-
-        # Format the base models
-        for model in base_models:
-            models.append(
-                {
-                    "id": model.get("id", ""),
-                    "name": model.get("name", ""),
-                    "displayName": f"Base: {model.get('name', '')}",
-                    "locale": model.get("locale", "Unknown"),
-                }
-            )
-
-        # Sort models by locale and name
-        models.sort(key=lambda m: (m.get("locale", ""), m.get("name", "")))
-    except Exception as e:
-        logger.warning(f"Error fetching models for upload page: {str(e)}")
-
-    return render_template("upload.html", models=models)
+    return render_template("upload.html")
 
 
 @files_bp.route("/upload/start", methods=["POST"])

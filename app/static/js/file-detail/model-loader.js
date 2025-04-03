@@ -30,7 +30,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         option.value = model.id;
                         option.dataset.name = model.name;
                         option.dataset.locale = model.locale;  // Store locale in dataset
-                        option.textContent = `${model.displayName || model.name} (${model.locale})`;
+                        option.textContent = `${model.displayName}`;
                         modelSelect.appendChild(option);
                     });
                 }
