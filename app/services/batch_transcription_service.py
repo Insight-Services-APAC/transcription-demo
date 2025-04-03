@@ -14,7 +14,7 @@ class BatchTranscriptionService:
     Azure Batch Transcription REST API, using simple requests calls.
     """
 
-    def __init__(self, subscription_key, region):
+    def __init__(self, locale, subscription_key, region):
         self.subscription_key = subscription_key
         self.region = region
         self.base_url = f'https://{region}.api.cognitive.microsoft.com/speechtotext'
@@ -25,7 +25,7 @@ class BatchTranscriptionService:
             raise ValidationError('Azure Speech API region is required but was not provided. Check your .env and ensure AZURE_SPEECH_REGION is set.', field='region')
         self.logger.info(f'Initialized BatchTranscriptionService with region: {region}')
 
-    def submit_transcription(self, audio_url, locale='en-US', enable_diarization=True, model_id=None):
+    def submit_transcription(self, audio_url, enable_diarization=True, model_id=None):
         """
         Submit a transcription job using the optional custom/base model if provided.
         """
@@ -45,14 +45,15 @@ class BatchTranscriptionService:
         }
         data = {
             'contentUrls': [audio_url],
-            'locale': locale,
+            'locale': 
             'displayName': os.path.basename(urlparse(audio_url).path),
             'properties': properties
         }
-        # If a model id is provided, add it as an entity reference.
         if model_id:
+            # model_id is now the full self URL from the API
+            self.logger.info(f'Using model with URL: {model_id}')
             data["model"] = {
-                "self": f"{self.base_url}/models/{model_id}?api-version=2024-11-15"
+                "self": model_id  # Use the full URL directly
             }
         headers = {
             'Ocp-Apim-Subscription-Key': self.subscription_key,

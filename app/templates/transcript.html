@@ -28,11 +28,9 @@
                         <i class="fas fa-users me-1"></i>{{ file.speaker_count }} speakers
                     </span>
                 {% endif %}
-                {% if file.model_name %}
-                    <span class="badge bg-primary bg-opacity-10 text-primary px-3 py-2">
-                        <i class="fas fa-microphone-alt me-1"></i>{{ file.model_name }}
-                    </span>
-                {% endif %}
+                <span class="badge bg-{{ 'primary' if file.model_name and file.model_name != 'Default' else 'secondary' }} bg-opacity-10 text-{{ 'primary' if file.model_name and file.model_name != 'Default' else 'secondary' }} px-3 py-2">
+                    <i class="fas fa-microphone-alt me-1"></i>{{ file.model_name or 'Default' }}
+                </span>
             </p>
         </div>
     </div>

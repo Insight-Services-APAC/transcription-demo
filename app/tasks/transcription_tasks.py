@@ -70,7 +70,6 @@ def transcribe_file(file_id):
         # Pass the model_id to the transcription service if provided
         result_job = transcription_service.submit_transcription(
             audio_url=file.blob_url, 
-            locale='en-US', 
             enable_diarization=True,
             model_id=model_id
         )

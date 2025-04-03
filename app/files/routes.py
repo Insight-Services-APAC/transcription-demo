@@ -57,7 +57,7 @@ def start_transcription(file_id):
     
     # Check if a specific model ID is provided in the form
     model_id = request.form.get('model_id')
-    model_name = request.form.get('model_name')
+    model_name = request.form.get('model_name', "Default")
     
     if model_id:
         file.model_id = model_id
@@ -158,7 +158,6 @@ def api_models():
 
         service = BatchTranscriptionService(subscription_key, region)
 
-        # --- Fetch Models (No change here) ---
         base_models = []
         try:
             base_models_response = service.list_models(model_type="base")
@@ -174,11 +173,10 @@ def api_models():
         except Exception as e:
             logger.warning(f'Error retrieving custom models: {str(e)}')
 
-        # --- Process Models ---
         all_models_output = []
         latest_base_models_by_locale = {}
 
-        # 1. Process Base Models: Find latest per locale (No change here)
+        # 1. When processing base models, store the self URL
         for model in base_models:
             locale = model.get('locale')
             created_str = model.get('createdDateTime')
@@ -186,44 +184,45 @@ def api_models():
             try:
                 created_dt = datetime.fromisoformat(created_str.replace('Z', '+00:00'))
             except ValueError:
-                logger.warning(f"Could not parse createdDateTime '{created_str}' for base model {model.get('id')}")
+                logger.warning(f"Could not parse createdDateTime '{created_str}' for base model")
                 continue
-            model_description = model.get('description') or model.get('name') or model.get('id', 'Unknown Model')
+            model_description = model.get('description') or model.get('name') or 'Unknown Model'
             current_entry = latest_base_models_by_locale.get(locale)
             if not current_entry or created_dt > current_entry['created_dt']:
                 latest_base_models_by_locale[locale] = {
-                    'id': model.get('id'), 'name': model.get('name'), 'locale': locale,
-                    'created_dt': created_dt, 'description': model_description, 'type': 'base'
+                    'id': model.get('self'),  
+                    'name': model.get('name'),
+                    'locale': locale,
+                    'created_dt': created_dt,
+                    'description': model_description,
+                    'type': 'base'
                 }
 
-        # 2. Format Latest Base Models for Output (Locale - Description Format)
+        # 2. When creating output model data for base models
         for locale, model_data in latest_base_models_by_locale.items():
-            locale_str = model_data['locale'] # Get the locale string
+            locale_str = model_data['locale']
             description_part = model_data['description'] if model_data['description'] else 'Default'
-            # *** CORRECTED DISPLAY NAME FORMAT ***
-            display_name = f"{locale_str} - {description_part}" # Use locale instead of "Base"
+            display_name = f"{locale_str} - {description_part}" 
 
             all_models_output.append({
-                'id': model_data['id'],
+                'id': model_data['id'],  
                 'name': model_data['name'],
-                'displayName': display_name, # Use the new format
-                'locale': locale_str,         # Keep original locale data
+                'displayName': display_name,
+                'locale': locale_str,
                 'type': 'base'
             })
 
-        # 3. Format Custom Models for Output (Locale - Custom: Name Format)
+        # 3. When processing custom models
         for model in custom_models:
-            locale_str = model.get('locale', 'Unknown') # Get the locale string
+            locale_str = model.get('locale', 'Unknown')
             name = model.get('name', 'Unnamed')
-            # *** CORRECTED DISPLAY NAME FORMAT ***
-            # Using "Custom:" prefix here helps distinguish them clearly
             display_name = f"{locale_str} - Custom: {name}"
 
             all_models_output.append({
-                'id': model.get('id', ''),
+                'id': model.get('self', ''),  # CHANGED: Use self URL instead of id
                 'name': name,
-                'displayName': display_name, # Use the new format
-                'locale': locale_str,         # Keep original locale data
+                'displayName': display_name,
+                'locale': locale_str,
                 'type': 'custom'
             })
 
@@ -254,19 +253,15 @@ def upload():
         if not file.filename.lower().endswith(('.mp3', '.wav')):
             raise ValidationError('Only .MP3 and .WAV files are allowed', field='file')
         
-        # Get model selection if provided
         model_id = request.form.get('transcription_model')
         model_name = None
         
-        # If model was selected, get the display name
         if model_id:
-            # Model name would be fetched from API or cache in a real application
             try:
                 subscription_key = current_app.config['AZURE_SPEECH_KEY']
                 region = current_app.config['AZURE_SPEECH_REGION']
                 service = BatchTranscriptionService(subscription_key, region)
                 
-                # First try base models
                 base_models = service.list_models(model_type="base").get('values', [])
                 for model in base_models:
                     if model.get('id') == model_id:
@@ -328,7 +323,7 @@ def upload():
                     progress_percent=0.0, 
                     user_id=current_user.id,
                     model_id=model_id,
-                    model_name=model_name
+                    model_name=model_name if model_name else "Default"
                 )
                 db.session.add(file_record)
                 db.session.commit()
@@ -409,6 +404,10 @@ def start_upload():
         model_id = request.form.get('model_id')
         model_name = request.form.get('model_name')
         
+        # Log model info for debugging
+        if model_id:
+            logger.info(f'Model selected - ID: {model_id}, Name: {model_name}')
+        
         filename = secure_filename(file.filename)
         try:
             tmp_path = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
@@ -440,8 +439,7 @@ def start_upload():
             
             if model_id:
                 task_kwargs['model_id'] = model_id
-                if model_name:
-                    task_kwargs['model_name'] = model_name
+                task_kwargs['model_name'] = model_name
             
             task = upload_to_azure_task.delay(**task_kwargs)
             return jsonify({'upload_id': upload_id, 'task_id': task.id})

@@ -131,7 +131,7 @@ def upload_to_azure_task(self, tmp_path, filename, upload_id, user_id=None, mode
                     progress_percent=0.0, 
                     user_id=user_id,
                     model_id=model_id,
-                    model_name=model_name
+                    model_name=model_name if model_name else "Default"
                 )
                 
                 session.add(file_record)

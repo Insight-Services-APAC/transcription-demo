@@ -85,14 +85,15 @@
                                 {% endif %}
                             </td>
                             <td>
-                                {% if file.model_name %}
-                                    <span class="badge bg-primary bg-opacity-10 text-primary px-3 py-2">
-                                        {{ file.model_name }}
-                                    </span>
-                                {% else %}
-                                    <span class="text-muted">Default</span>
-                                {% endif %}
-                            </td>
+                                <td>
+                                    {% if file.model_name and file.model_name != 'Default' %}
+                                        <span class="badge bg-primary bg-opacity-10 text-primary px-3 py-2">
+                                            {{ file.model_name }}
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-secondary bg-opacity-10 text-secondary px-3 py-2">Default</span>
+                                    {% endif %}
+                                </td>
                             <td>
                                 {% if file.status == 'completed' and file.accuracy_percent %}
                                     {% set accuracy_class = 'success' if file.accuracy_percent >= 90 else ('warning' if file.accuracy_percent >= 75 else 'danger') %}

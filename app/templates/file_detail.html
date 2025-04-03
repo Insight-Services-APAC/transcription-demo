@@ -72,12 +72,12 @@
                 </div>
                 {% endif %}
                 
-                {% if file.model_name %}
                 <div class="d-flex justify-content-between mb-3">
                     <span class="text-muted">Transcription Model</span>
-                    <span class="badge bg-primary bg-opacity-10 text-primary px-3 py-2">{{ file.model_name }}</span>
+                    <span class="badge bg-{{ 'primary' if file.model_name else 'secondary' }} bg-opacity-10 text-{{ 'primary' if file.model_name else 'secondary' }} px-3 py-2">
+                        {{ file.model_name or 'Default' }}
+                    </span>
                 </div>
-                {% endif %}
                 
                 {% if file.accuracy_percent and file.status == 'completed' %}
                 <div class="d-flex justify-content-between mb-3">
