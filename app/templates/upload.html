@@ -12,20 +12,20 @@
         <div class="card">
             <div class="card-body p-4">
                 <h2 class="card-title fw-bold mb-4">Upload Audio File</h2>
-                
+
                 <div class="alert alert-light border-start border-4 border-primary mb-4">
                     <p class="mb-0">Upload a .MP3 or .WAV file (up to 5GB) for transcription and speaker diarization.</p>
                 </div>
-                
-                <form method="POST" action="{{ url_for('files.upload') }}" enctype="multipart/form-data" id="uploadForm" 
-                      data-start-url="{{ url_for('files.start_upload') }}" 
+
+                <form method="POST" action="{{ url_for('files.upload') }}" enctype="multipart/form-data" id="uploadForm"
+                      data-start-url="{{ url_for('files.start_upload') }}"
                       data-progress-url="{{ url_for('files.upload_progress', upload_id='UPLOAD_ID_PLACEHOLDER') }}"
                       data-files-url="{{ url_for('files.file_list') }}"
                       data-models-url="{{ url_for('files.api_models') }}">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                     <div class="mb-4">
                         <div class="form-file-container p-4 rounded border border-2 border-dashed text-center position-relative">
-                            <input class="form-control position-absolute opacity-0 top-0 start-0 w-100 h-100" 
+                            <input class="form-control position-absolute opacity-0 top-0 start-0 w-100 h-100"
                                    id="file" name="file" type="file" accept=".mp3,.wav" required>
                             <div class="py-5" id="dropAreaContent">
                                 <i class="fas fa-cloud-upload-alt fa-3x text-primary mb-3"></i>
@@ -41,19 +41,25 @@
                         </div>
                         <div class="form-text mt-2">Only .MP3 and .WAV format files are accepted.</div>
                     </div>
-                    
-                    <!-- Model selection -->
+
                     <div class="mb-4">
                         <label for="transcription_model" class="form-label">Transcription Model</label>
-                        <select class="form-select" id="transcription_model" name="transcription_model">
+                        <select class="form-select" id="transcription_model" name="transcription_model" aria-describedby="modelHelp">
                             <option value="">-- Default Model --</option>
-                            {% if models %}
-                                {% for model in models %}
-                                <option value="{{ model.id }}" data-name="{{ model.name }}">{{ model.displayName }} ({{ model.locale }})</option>
-                                {% endfor %}
-                            {% endif %}
                         </select>
-                        <div class="form-text">Select a model for transcription. The default model will be used if none is selected.</div>
+                        <div id="modelHelp" class="form-text">
+                            <small>
+                                Select a model or use the default (an OpenAI model called <strong>Whisper</strong>).
+                            </small>
+                            <p class="mt-2 mb-1"><strong>General Characteristics:</strong></p>
+                            <ul class="mb-2">
+                                <li><strong>Unified:</strong> Newer, general-purpose models suitable for various scenarios.</li>
+                                <li><strong>Conversational:</strong> Optimized for multi-speaker audio like meetings or calls.</li>
+                                <li><strong>Interactive:</strong> Best for commands or short utterances.</li>
+                                <li><strong>Custom:</strong> Trained with your own data for specific use cases.</li>
+                            </ul>
+                            <em>Performance may vary depending on the model version and the audio content.</em>
+                        </div>
                         <div id="modelLoadingIndicator" class="d-none mt-2">
                             <div class="spinner-border spinner-border-sm text-primary me-2" role="status">
                                 <span class="visually-hidden">Loading models...</span>
@@ -61,10 +67,9 @@
                             <span>Loading available models...</span>
                         </div>
                     </div>
-                    
-                    <!-- Progress bar (hidden initially) -->
+
                     <div class="progress mb-3 d-none" id="uploadProgressContainer">
-                        <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary" 
+                        <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
                              id="uploadProgressBar" role="progressbar" style="width: 0%"></div>
                     </div>
                     <div id="uploadStatusText" class="text-center mb-3 d-none">
@@ -76,7 +81,7 @@
                     <div id="uploadTimeRemaining" class="text-center mb-3 d-none">
                         <small class="text-muted">Estimated time remaining: <span id="timeRemaining">Calculating...</span></small>
                     </div>
-                    
+
                     <div class="d-grid">
                         <button type="submit" class="btn btn-primary py-2" id="uploadButton">
                             <i class="fas fa-upload me-2"></i>Upload File
@@ -93,42 +98,43 @@
     <script type="module" src="{{ url_for('static', filename='js/file-upload/index.js') }}"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // Load models via API
             const modelDropdown = document.getElementById('transcription_model');
             const modelLoadingIndicator = document.getElementById('modelLoadingIndicator');
             const modelsUrl = document.getElementById('uploadForm').getAttribute('data-models-url');
-            
+
             if (modelDropdown && modelsUrl) {
-                // Show loading indicator
                 if (modelLoadingIndicator) {
                     modelLoadingIndicator.classList.remove('d-none');
                 }
-                
-                // Fetch models
+
                 window.fetchWithCsrf(modelsUrl)
                     .then(response => response.json())
                     .then(data => {
-                        // Clear existing options except the default one
                         while (modelDropdown.options.length > 1) {
                             modelDropdown.remove(1);
                         }
-                        
-                        // Add new options from the API
+
                         if (data.models && data.models.length > 0) {
                             data.models.forEach(model => {
                                 const option = document.createElement('option');
                                 option.value = model.id;
                                 option.dataset.name = model.name;
-                                option.textContent = `${model.displayName || model.name} (${model.locale})`;
+                                option.textContent = model.displayName;
                                 modelDropdown.appendChild(option);
                             });
                         }
                     })
                     .catch(error => {
                         console.error('Error loading models:', error);
+                        const helpText = document.getElementById('modelHelp');
+                        if(helpText) {
+                            const errorEl = document.createElement('p');
+                            errorEl.className = 'text-danger mt-1';
+                            errorEl.textContent = 'Error loading transcription models.';
+                            helpText.parentNode.insertBefore(errorEl, helpText.nextSibling);
+                        }
                     })
                     .finally(() => {
-                        // Hide loading indicator
                         if (modelLoadingIndicator) {
                             modelLoadingIndicator.classList.add('d-none');
                         }

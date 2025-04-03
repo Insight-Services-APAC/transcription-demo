@@ -2,6 +2,7 @@ import os
 import logging
 import uuid
 import time
+from datetime import datetime, timezone 
 from flask import render_template, redirect, url_for, flash, request, jsonify, current_app
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
@@ -142,26 +143,29 @@ def api_file_detail(file_id):
 @approval_required
 @csrf.exempt
 def api_models():
-    """API endpoint to get available transcription models"""
+    """
+    API endpoint to get available transcription models.
+    Formats the displayName as 'LOCALE - Description' for base models
+    and 'LOCALE - Custom: Name' for custom models.
+    """
     try:
-        subscription_key = current_app.config['AZURE_SPEECH_KEY']
-        region = current_app.config['AZURE_SPEECH_REGION']
-        
+        subscription_key = current_app.config.get('AZURE_SPEECH_KEY')
+        region = current_app.config.get('AZURE_SPEECH_REGION')
+
         if not subscription_key or not region:
-            return jsonify({'error': 'Missing Azure Speech API configuration', 'models': []})
-        
+            logger.error('Azure Speech API configuration (Key or Region) is missing.')
+            return jsonify({'error': 'Missing Azure Speech API configuration', 'models': []}), 500
+
         service = BatchTranscriptionService(subscription_key, region)
-        
-        # First fetch base models
+
+        # --- Fetch Models (No change here) ---
         base_models = []
         try:
             base_models_response = service.list_models(model_type="base")
             base_models = base_models_response.get('values', [])
-            logger.info(f'Retrieved {len(base_models)} base models')
+            logger.info(f'Retrieved {len(base_models)} raw base models')
         except Exception as e:
             logger.error(f'Error retrieving base models: {str(e)}')
-        
-        # Then fetch custom models if available
         custom_models = []
         try:
             custom_models_response = service.list_models(model_type="custom")
@@ -169,36 +173,72 @@ def api_models():
             logger.info(f'Retrieved {len(custom_models)} custom models')
         except Exception as e:
             logger.warning(f'Error retrieving custom models: {str(e)}')
-        
-        # Combine and format the models
-        all_models = []
-        
+
+        # --- Process Models ---
+        all_models_output = []
+        latest_base_models_by_locale = {}
+
+        # 1. Process Base Models: Find latest per locale (No change here)
         for model in base_models:
-            all_models.append({
-                'id': model.get('id', ''),
-                'name': model.get('name', ''),
-                'displayName': f"Base: {model.get('name', '')}",
-                'locale': model.get('locale', 'Unknown'),
+            locale = model.get('locale')
+            created_str = model.get('createdDateTime')
+            if not locale or not created_str: continue
+            try:
+                created_dt = datetime.fromisoformat(created_str.replace('Z', '+00:00'))
+            except ValueError:
+                logger.warning(f"Could not parse createdDateTime '{created_str}' for base model {model.get('id')}")
+                continue
+            model_description = model.get('description') or model.get('name') or model.get('id', 'Unknown Model')
+            current_entry = latest_base_models_by_locale.get(locale)
+            if not current_entry or created_dt > current_entry['created_dt']:
+                latest_base_models_by_locale[locale] = {
+                    'id': model.get('id'), 'name': model.get('name'), 'locale': locale,
+                    'created_dt': created_dt, 'description': model_description, 'type': 'base'
+                }
+
+        # 2. Format Latest Base Models for Output (Locale - Description Format)
+        for locale, model_data in latest_base_models_by_locale.items():
+            locale_str = model_data['locale'] # Get the locale string
+            description_part = model_data['description'] if model_data['description'] else 'Default'
+            # *** CORRECTED DISPLAY NAME FORMAT ***
+            display_name = f"{locale_str} - {description_part}" # Use locale instead of "Base"
+
+            all_models_output.append({
+                'id': model_data['id'],
+                'name': model_data['name'],
+                'displayName': display_name, # Use the new format
+                'locale': locale_str,         # Keep original locale data
                 'type': 'base'
             })
-        
+
+        # 3. Format Custom Models for Output (Locale - Custom: Name Format)
         for model in custom_models:
-            all_models.append({
+            locale_str = model.get('locale', 'Unknown') # Get the locale string
+            name = model.get('name', 'Unnamed')
+            # *** CORRECTED DISPLAY NAME FORMAT ***
+            # Using "Custom:" prefix here helps distinguish them clearly
+            display_name = f"{locale_str} - Custom: {name}"
+
+            all_models_output.append({
                 'id': model.get('id', ''),
-                'name': model.get('name', ''),
-                'displayName': f"Custom: {model.get('name', '')}",
-                'locale': model.get('locale', 'Unknown'),
+                'name': name,
+                'displayName': display_name, # Use the new format
+                'locale': locale_str,         # Keep original locale data
                 'type': 'custom'
             })
-        
-        # Sort models by locale and name
-        all_models.sort(key=lambda m: (m.get('locale', ''), m.get('name', '')))
-        
-        return jsonify({'models': all_models})
-        
+
+        # 4. Sort the final list (by locale then name - No change here)
+        all_models_output.sort(key=lambda m: (
+            m.get('locale', ''),
+            m.get('name', '')
+        ))
+
+        logger.info(f'Returning {len(all_models_output)} processed models to the API.')
+        return jsonify({'models': all_models_output})
+
     except Exception as e:
-        logger.error(f'Error in api_models: {str(e)}')
-        return jsonify({'error': str(e), 'models': []})
+        logger.error(f'Unexpected error in api_models endpoint: {str(e)}', exc_info=True)
+        return jsonify({'error': f'An unexpected error occurred while retrieving models: {str(e)}', 'models': []}), 500
 
 @files_bp.route('/upload', methods=['GET', 'POST'])
 @login_required
