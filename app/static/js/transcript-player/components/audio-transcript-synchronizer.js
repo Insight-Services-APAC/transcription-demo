@@ -18,11 +18,11 @@ export class AudioTranscriptSynchronizer {
 
   onTimeUpdate(currentTime) {
     if (!this.transcriptData || !this.transcriptRenderer) return;
-    
+
     try {
       // Highlight the current segment
       this.transcriptRenderer.highlightSegmentAtTime(currentTime);
-      
+
       // Highlight the current word if word-level timestamps are available
       // This will work with both standard and Whisper transcripts
       this.transcriptRenderer.highlightWordAtTime(currentTime);
