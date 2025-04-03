@@ -450,7 +450,7 @@ def start_upload():
         # Get model selection if provided
         model_id = request.form.get("model_id")
         model_name = request.form.get("model_name")
-        model_locale = request.form.get("model_locale")  # Get the locale
+        model_locale = request.form.get("model_locale")  
 
         # Log model info for debugging
         if model_id:

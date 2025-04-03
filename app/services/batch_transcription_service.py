@@ -1,7 +1,7 @@
 import os
 import time
 import json
-import datetime  # Added for date comparison
+import datetime 
 import requests
 from urllib.parse import urlparse
 import logging
@@ -59,7 +59,6 @@ class BatchTranscriptionService:
             "profanityFilterMode": "Masked",
         }
 
-        # Use provided locale parameter, fall back to self.locale, or use default "en-US"
         use_locale = locale or self.locale or "en-US"
         self.logger.info(f"Using locale: {use_locale} for transcription")
 
@@ -70,9 +69,11 @@ class BatchTranscriptionService:
             "properties": properties,
         }
         if model_id:
-            # model_id is now the full self URL from the API
             self.logger.info(f"Using model with URL: {model_id}")
-            data["model"] = {"self": model_id}  # Use the full URL directly
+            data["model"] = {"self": model_id}
+        else:
+            self.logger.info(f"Using default model")
+            data["model"] = {"self": <whisper URL>}
         headers = {
             "Ocp-Apim-Subscription-Key": self.subscription_key,
             "Content-Type": "application/json",

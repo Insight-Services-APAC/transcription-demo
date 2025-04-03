@@ -7,10 +7,23 @@ export class TranscriptRendererComponent {
     this.transcriptContainer = document.getElementById("transcript-container");
     this.segments = [];
     this.activeSegment = null;
+    this.isWhisperModel = false;
   }
 
   setData(data) {
     this.segments = data.segments || [];
+    
+    // Detect if this is likely a Whisper model output
+    if (this.segments.length > 0) {
+      const firstSegment = this.segments[0];
+      // Whisper is a display-only model without lexical data
+      // It may have different property names or missing properties
+      this.isWhisperModel = !firstSegment.words || 
+                           (firstSegment.words && firstSegment.words.length > 0 && 
+                            typeof firstSegment.words[0].confidence === 'undefined');
+      
+      console.log("Detected transcript type:", this.isWhisperModel ? "Whisper model" : "Standard model");
+    }
   }
 
   render() {
@@ -45,21 +58,31 @@ export class TranscriptRendererComponent {
       // Process words with confidence
       let processedText = segment.text;
 
-      // If segment has words with confidence, create highlighted spans
-      if (segment.words && segment.words.length > 0) {
+      // Handle word-level highlighting based on model type
+      if (!this.isWhisperModel && segment.words && segment.words.length > 0) {
+        // Standard model with confidence scores
         processedText = this.createHighlightedText(segment.words, segment.text);
+      } else if (this.isWhisperModel && segment.displayWords && segment.displayWords.length > 0) {
+        // Whisper model with display words
+        processedText = this.createWhisperHighlightedText(segment.displayWords, segment.text);
       }
 
       // Format timestamp display in a user-friendly way
-      const timestampDisplay = `${segment.start} - ${segment.end}`;
+      const start = this.formatTimestamp(segment.start || segment.offsetSeconds || (segment.offsetMilliseconds / 1000));
+      const end = this.formatTimestamp(segment.end || segment.endSeconds || ((segment.offsetMilliseconds + segment.durationMilliseconds) / 1000));
+      const timestampDisplay = `${start} - ${end}`;
+
+      // Get time values for segment, accounting for different property names
+      const startTime = segment.offsetSeconds || (segment.offsetMilliseconds / 1000) || 0;
+      const endTime = segment.endSeconds || ((segment.offsetMilliseconds + segment.durationMilliseconds) / 1000) || 0;
 
       html += `
-                <div class="speaker-segment speaker-${speakerNum}" data-index="${index}" data-start="${segment.offsetMilliseconds / 1000}" data-end="${(segment.offsetMilliseconds + segment.durationMilliseconds) / 1000}">
-                    <span class="timestamp">${timestampDisplay}</span>
-                    <span class="speaker-label">Speaker ${segment.speaker !== undefined ? speakerMap[segment.speaker] : 1}</span>
-                    <span class="segment-text">${processedText}</span>
-                </div>
-            `;
+        <div class="speaker-segment speaker-${speakerNum}" data-index="${index}" data-start="${startTime}" data-end="${endTime}">
+          <span class="timestamp">${timestampDisplay}</span>
+          <span class="speaker-label">Speaker ${segment.speaker !== undefined ? speakerMap[segment.speaker] : 1}</span>
+          <span class="segment-text">${processedText}</span>
+        </div>
+      `;
     });
 
     this.transcriptContainer.innerHTML = html;
@@ -77,13 +100,43 @@ export class TranscriptRendererComponent {
         confidenceClass = "medium-confidence";
       }
 
-      highlightedText += `<span class="word-highlight ${confidenceClass}" data-start="${word.offsetMilliseconds / 1000}" data-end="${(word.offsetMilliseconds + word.durationMilliseconds) / 1000}">
-                ${word.word}
-                <span class="word-tooltip">Confidence: ${Math.round(word.confidence * 100)}%</span>
-            </span> `;
+      // Get timing info, handling different property names
+      const startTime = word.offsetSeconds || (word.offsetMilliseconds / 1000);
+      const endTime = word.endSeconds || ((word.offsetMilliseconds + word.durationMilliseconds) / 1000);
+
+      highlightedText += `<span class="word-highlight ${confidenceClass}" data-start="${startTime}" data-end="${endTime}">
+        ${word.word || word.text}
+        <span class="word-tooltip">Confidence: ${Math.round((word.confidence || 0.9) * 100)}%</span>
+      </span> `;
     });
 
     return highlightedText;
+  }
+
+  createWhisperHighlightedText(displayWords, originalText) {
+    let highlightedText = "";
+
+    displayWords.forEach((word) => {
+      // Whisper doesn't provide confidence scores, so we'll use high-confidence for all
+      const confidenceClass = "high-confidence";
+      
+      // Get timing info from the displayWords format
+      const startTime = word.offsetSeconds || (word.offset / 1000) || 0;
+      const endTime = startTime + (word.durationSeconds || (word.duration / 1000) || 0.5);
+
+      highlightedText += `<span class="word-highlight ${confidenceClass}" data-start="${startTime}" data-end="${endTime}">
+        ${word.text || word.word || word.display}
+      </span> `;
+    });
+
+    return highlightedText;
+  }
+
+  formatTimestamp(seconds) {
+    if (!seconds || isNaN(seconds)) return "00:00";
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = Math.floor(seconds % 60);
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   }
 
   showEmpty() {
@@ -93,11 +146,11 @@ export class TranscriptRendererComponent {
 
   showError(message) {
     this.transcriptContainer.innerHTML = `
-            <div class="alert alert-danger">
-                <i class="fas fa-exclamation-triangle me-2"></i>
-                ${message}
-            </div>
-        `;
+      <div class="alert alert-danger">
+        <i class="fas fa-exclamation-triangle me-2"></i>
+        ${message}
+      </div>
+    `;
   }
 
   highlightSegmentAtTime(currentTime) {

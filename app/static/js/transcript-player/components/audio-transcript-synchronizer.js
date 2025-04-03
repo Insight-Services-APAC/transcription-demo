@@ -17,7 +17,17 @@ export class AudioTranscriptSynchronizer {
   }
 
   onTimeUpdate(currentTime) {
-    this.transcriptRenderer.highlightSegmentAtTime(currentTime);
-    this.transcriptRenderer.highlightWordAtTime(currentTime);
+    if (!this.transcriptData || !this.transcriptRenderer) return;
+    
+    try {
+      // Highlight the current segment
+      this.transcriptRenderer.highlightSegmentAtTime(currentTime);
+      
+      // Highlight the current word if word-level timestamps are available
+      // This will work with both standard and Whisper transcripts
+      this.transcriptRenderer.highlightWordAtTime(currentTime);
+    } catch (error) {
+      console.error("Error during transcript synchronization:", error);
+    }
   }
 }

@@ -31,7 +31,7 @@ document.addEventListener("DOMContentLoaded", function () {
           data.models.forEach((model) => {
             const option = document.createElement("option");
             option.value = model.id;
-            option.dataset.name = model.displayName; // Use displayName instead of name
+            option.dataset.name = model.displayName; 
             option.dataset.locale = model.locale;
             option.textContent = model.displayName;
             modelDropdown.appendChild(option);
