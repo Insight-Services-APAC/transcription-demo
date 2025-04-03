@@ -257,7 +257,7 @@ def api_models():
             description_part = (
                 model_data["description"] if model_data["description"] else "Default"
             )
-            display_name = f"{locale_str} - {description_part}"
+            display_name = f"{locale_str}"
 
             all_models_output.append(
                 {
@@ -321,36 +321,12 @@ def upload():
             raise ValidationError("Only .MP3 and .WAV files are allowed", field="file")
 
         model_id = request.form.get("transcription_model")
-        model_name = None
-        model_locale = request.form.get("model_locale")  # Get the locale
+        model_name = request.form.get("transcription_model")
+        model_locale = request.form.get("model_locale")
 
-        if model_id:
-            try:
-                subscription_key = current_app.config["AZURE_SPEECH_KEY"]
-                region = current_app.config["AZURE_SPEECH_REGION"]
-                service = BatchTranscriptionService(subscription_key, region)
-
-                base_models = service.list_models(model_type="base").get("values", [])
-                for model in base_models:
-                    if model.get("self") == model_id:  # Changed from "id" to "self"
-                        model_name = model.get("displayName")  # Changed from "name" to "displayName"
-                        break
-
-                # If not found, check custom models
-                if not model_name:
-                    custom_models = service.list_models(model_type="custom").get(
-                        "values", []
-                    )
-                    for model in custom_models:
-                        if model.get("self") == model_id:  # Changed from "id" to "self"
-                            model_name = model.get("displayName")  # Changed from "name" to "displayName"
-                            break
-            except Exception as e:
-                logger.warning(f"Error fetching model name: {str(e)}")
-
-            logger.info(
-                f"Selected model: {model_id} ({model_name}) with locale: {model_locale}"
-            )
+        logger.info(
+            f"Selected model: {model_id} ({model_name}) with locale: {model_locale}"
+        )
 
         filename = secure_filename(file.filename)
         try:

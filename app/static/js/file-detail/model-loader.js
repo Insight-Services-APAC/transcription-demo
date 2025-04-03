@@ -28,8 +28,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     data.models.forEach(model => {
                         const option = document.createElement('option');
                         option.value = model.id;
-                        option.dataset.name = model.name;
-                        option.dataset.locale = model.locale;  // Store locale in dataset
+                        option.dataset.name = model.displayName; // Use displayName instead of name
+                        option.dataset.locale = model.locale;
                         option.textContent = `${model.displayName}`;
                         modelSelect.appendChild(option);
                     });
