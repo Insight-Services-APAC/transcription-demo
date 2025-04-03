@@ -1,7 +1,7 @@
 import os
 import time
 import json
-import datetime 
+import datetime
 import requests
 from urllib.parse import urlparse
 import logging
@@ -39,6 +39,7 @@ class BatchTranscriptionService:
     ):
         """
         Submit a transcription job using the optional custom/base model if provided.
+        If no model_id is provided, the Whisper model URL is used by default.
         """
         url = f"{self.base_url}/transcriptions:submit?api-version=2024-11-15"
         if not audio_url:
@@ -53,6 +54,7 @@ class BatchTranscriptionService:
         properties = {
             "timeToLiveHours": "12",
             "diarization": {"enabled": enable_diarization},
+            # For Whisper models, we use displayFormWordLevelTimestampsEnabled
             "wordLevelTimestampsEnabled": True,
             "displayFormWordLevelTimestampsEnabled": True,
             "punctuationMode": "DictatedAndAutomatic",
@@ -72,8 +74,12 @@ class BatchTranscriptionService:
             self.logger.info(f"Using model with URL: {model_id}")
             data["model"] = {"self": model_id}
         else:
-            self.logger.info(f"Using default model")
-            data["model"] = {"self": <whisper URL>}
+            self.logger.info("Using default Whisper model")
+            # Construct the Whisper model URL based on the provided region.
+            whisper_url = f"https://{self.region}.api.cognitive.microsoft.com/speechtotext/v3.2/models/base/e418c4a9-9937-4db7-b2c9-8afbff72d950"
+            data["model"] = {"self": whisper_url}
+            # Remove wordLevelTimestampsEnabled as Whisper uses displayFormWordLevelTimestampsEnabled instead.
+            data["properties"].pop("wordLevelTimestampsEnabled", None)
         headers = {
             "Ocp-Apim-Subscription-Key": self.subscription_key,
             "Content-Type": "application/json",
