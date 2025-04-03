@@ -26,7 +26,7 @@ def get_blob_service():
         raise StorageError(f'Failed to initialize blob storage service: {str(e)}', service='azure_storage')
 
 @shared_task
-def transcribe_file(file_id):
+def transcribe_file(file_id, model_locale=None):
     """
     Main Celery task that orchestrates the batch transcription pipeline 
     using Azure's Speech Service Batch Transcription API.
@@ -56,12 +56,14 @@ def transcribe_file(file_id):
         if not subscription_key or not region:
             raise TranscriptionError('Missing Azure Speech API configuration. Check AZURE_SPEECH_KEY and AZURE_SPEECH_REGION.', service='azure_speech')
         
-        transcription_service = BatchTranscriptionService(subscription_key, region)
+        transcription_service = BatchTranscriptionService(subscription_key, region, locale=model_locale)
         
         # Check if a specific model is requested
         model_id = file.model_id
         if model_id:
             logger.info(f'Using specified model: {model_id} ({file.model_name or "unknown"})')
+            if model_locale:
+                logger.info(f'Using locale: {model_locale}')
         else:
             logger.info('Using default model (no specific model requested)')
         
@@ -71,7 +73,8 @@ def transcribe_file(file_id):
         result_job = transcription_service.submit_transcription(
             audio_url=file.blob_url, 
             enable_diarization=True,
-            model_id=model_id
+            model_id=model_id,
+            locale=model_locale
         )
         
         transcription_id = result_job['id']

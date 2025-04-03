@@ -66,7 +66,7 @@ class UploadProgressTracker:
         return None
 
 @shared_task(bind=True)
-def upload_to_azure_task(self, tmp_path, filename, upload_id, user_id=None, model_id=None, model_name=None):
+def upload_to_azure_task(self, tmp_path, filename, upload_id, user_id=None, model_id=None, model_name=None, model_locale=None):
     """
     Celery task to handle file upload to Azure Blob Storage.
     
@@ -77,8 +77,9 @@ def upload_to_azure_task(self, tmp_path, filename, upload_id, user_id=None, mode
         user_id: ID of the user who uploaded the file
         model_id: Optional ID of the model to use for transcription
         model_name: Optional name of the model to use for transcription
+        model_locale: Optional locale of the model for transcription
     """
-    logger.info(f'Starting upload task for {filename} (ID: {upload_id}, User: {user_id}, Model: {model_id})')
+    logger.info(f'Starting upload task for {filename} (ID: {upload_id}, User: {user_id}, Model: {model_id}, Locale: {model_locale})')
     from flask import current_app
     from app import create_app
     env = os.environ.get('FLASK_ENV', 'development')
@@ -100,6 +101,7 @@ def upload_to_azure_task(self, tmp_path, filename, upload_id, user_id=None, mode
             if model_id:
                 progress_data['model_id'] = model_id
                 progress_data['model_name'] = model_name
+                progress_data['model_locale'] = model_locale
                 
             progress_tracker.update_progress(upload_id, progress_data)
         except Exception as e:
@@ -146,7 +148,7 @@ def upload_to_azure_task(self, tmp_path, filename, upload_id, user_id=None, mode
                 logger.error(f'Error removing temporary file: {str(e)}')
             try:
                 from app.tasks.transcription_tasks import transcribe_file
-                transcribe_result = transcribe_file.delay(file_record.id)
+                transcribe_result = transcribe_file.delay(file_record.id, model_locale=model_locale)
             except Exception as e:
                 log_exception(e, logger)
                 raise UploadError(f'Error starting transcription task: {str(e)}', filename=filename, file_id=file_record.id)

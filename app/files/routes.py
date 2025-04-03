@@ -58,6 +58,7 @@ def start_transcription(file_id):
     # Check if a specific model ID is provided in the form
     model_id = request.form.get('model_id')
     model_name = request.form.get('model_name', "Default")
+    model_locale = request.form.get('model_locale')  # Get the locale
     
     if model_id:
         file.model_id = model_id
@@ -68,7 +69,7 @@ def start_transcription(file_id):
     file.progress_percent = 0.0
     db.session.commit()
     
-    result = transcribe_file.delay(file_id)
+    result = transcribe_file.delay(file_id, model_locale=model_locale)
     flash('Transcription started', 'success')
     return redirect(url_for('files.file_detail', file_id=file_id))
 
@@ -255,6 +256,7 @@ def upload():
         
         model_id = request.form.get('transcription_model')
         model_name = None
+        model_locale = request.form.get('model_locale')  # Get the locale
         
         if model_id:
             try:
@@ -278,7 +280,7 @@ def upload():
             except Exception as e:
                 logger.warning(f'Error fetching model name: {str(e)}')
                 
-            logger.info(f'Selected model: {model_id} ({model_name})')
+            logger.info(f'Selected model: {model_id} ({model_name}) with locale: {model_locale}')
         
         filename = secure_filename(file.filename)
         try:
@@ -294,7 +296,7 @@ def upload():
                     log_exception(e, logger)
                     logger.warning(f'Failed to update progress tracker: {str(e)}')
                 
-                # Include model ID and name if provided
+                # Include model ID, name, and locale if provided
                 task_kwargs = {
                     'tmp_path': tmp_path,
                     'filename': filename,
@@ -306,6 +308,8 @@ def upload():
                     task_kwargs['model_id'] = model_id
                     if model_name:
                         task_kwargs['model_name'] = model_name
+                    if model_locale:
+                        task_kwargs['model_locale'] = model_locale
                 
                 task = upload_to_azure_task.delay(**task_kwargs)
                 return jsonify({'upload_id': upload_id, 'task_id': task.id})
@@ -336,7 +340,7 @@ def upload():
                 logger.error(f'Error removing temporary file: {str(e)}')
             try:
                 from app.tasks.transcription_tasks import transcribe_file
-                transcribe_file.delay(file_record.id)
+                transcribe_file.delay(file_record.id, model_locale=model_locale)
             except Exception as e:
                 log_exception(e, logger)
                 flash(f'Warning: Error starting transcription process: {str(e)}', 'warning')
@@ -403,10 +407,11 @@ def start_upload():
         # Get model selection if provided
         model_id = request.form.get('model_id')
         model_name = request.form.get('model_name')
+        model_locale = request.form.get('model_locale')  # Get the locale
         
         # Log model info for debugging
         if model_id:
-            logger.info(f'Model selected - ID: {model_id}, Name: {model_name}')
+            logger.info(f'Model selected - ID: {model_id}, Name: {model_name}, Locale: {model_locale}')
         
         filename = secure_filename(file.filename)
         try:
@@ -423,13 +428,14 @@ def start_upload():
                     'progress': 0, 
                     'start_time': time.time(),
                     'model_id': model_id,
-                    'model_name': model_name
+                    'model_name': model_name,
+                    'model_locale': model_locale
                 })
             except Exception as e:
                 log_exception(e, logger)
                 logger.warning(f'Failed to update progress tracker: {str(e)}')
             
-            # Include model ID and name if provided
+            # Include model ID, name, and locale if provided
             task_kwargs = {
                 'tmp_path': tmp_path,
                 'filename': filename,
@@ -440,6 +446,7 @@ def start_upload():
             if model_id:
                 task_kwargs['model_id'] = model_id
                 task_kwargs['model_name'] = model_name
+                task_kwargs['model_locale'] = model_locale
             
             task = upload_to_azure_task.delay(**task_kwargs)
             return jsonify({'upload_id': upload_id, 'task_id': task.id})

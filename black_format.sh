@@ -1,19 +1,18 @@
 #!/bin/bash
 
-# Exit on error
-set -e
-
-# Get list of ignored paths from .gitignore and convert them to find-compatible prune paths
-PRUNE_PATHS=()
+# Read .gitignore and create a list of directories to prune
+PRUNE_ARGS=()
 while IFS= read -r line; do
-  # Skip empty lines and comments
+  # Skip comments and empty lines
   [[ -z "$line" || "$line" =~ ^# ]] && continue
-  # Only handle directories for pruning
+
+  # Only handle directory ignores ending in /
   if [[ "$line" == */ ]]; then
-    PRUNE_PATHS+=(-path "./${line%/}" -prune -o)
+    # Remove trailing slash for consistency
+    DIR="./${line%/}"
+    PRUNE_ARGS+=(-path "$DIR" -prune -o)
   fi
 done < .gitignore
 
-# Build the find command
-# Note: "${PRUNE_PATHS[@]}" expands into -path ./folder -prune -o for each ignored dir
-eval find . \( "${PRUNE_PATHS[@]}" -false \) -o -name "*.py" -print | xargs black
+# Find all .py files not in pruned directories and run black on them
+find . "${PRUNE_ARGS[@]}" -name "*.py" -print | xargs black

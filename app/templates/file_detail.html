@@ -201,6 +201,7 @@
                             <!-- Models will be loaded via API -->
                         </select>
                         <input type="hidden" id="model_name" name="model_name" value="">
+                        <input type="hidden" id="model_locale" name="model_locale" value="">
                         <div class="form-text">Select a model for transcription. The default model will be used if none is selected.</div>
                     </div>
                 </div>
@@ -250,58 +251,7 @@
     <script src="{{ url_for('static', filename='js/delete-modal.js') }}"></script>
     <script>
         document.body.dataset.fileApiUrl = "{{ url_for('files.api_file_detail', file_id=file.id) }}";
-        
-        // Load models for the transcription modal
-        document.addEventListener('DOMContentLoaded', function() {
-            const modelSelect = document.getElementById('transcription_model');
-            const modelNameInput = document.getElementById('model_name');
-            const modelsUrl = "{{ url_for('files.api_models') }}";
-            
-            if (modelSelect && modelsUrl) {
-                // Show loading option
-                const loadingOption = document.createElement('option');
-                loadingOption.textContent = 'Loading models...';
-                loadingOption.disabled = true;
-                modelSelect.appendChild(loadingOption);
-                
-                // Fetch models
-                window.fetchWithCsrf(modelsUrl)
-                    .then(response => response.json())
-                    .then(data => {
-                        // Remove loading option
-                        modelSelect.removeChild(loadingOption);
-                        
-                        // Add models from the API
-                        if (data.models && data.models.length > 0) {
-                            data.models.forEach(model => {
-                                const option = document.createElement('option');
-                                option.value = model.id;
-                                option.dataset.name = model.name;
-                                option.textContent = `${model.displayName || model.name} (${model.locale})`;
-                                modelSelect.appendChild(option);
-                            });
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error loading models:', error);
-                        const errorOption = document.createElement('option');
-                        errorOption.textContent = 'Error loading models';
-                        errorOption.disabled = true;
-                        modelSelect.innerHTML = '';
-                        modelSelect.appendChild(document.createElement('option')).textContent = '-- Default Model --';
-                        modelSelect.appendChild(errorOption);
-                    });
-                
-                // Update model name when selection changes
-                modelSelect.addEventListener('change', function() {
-                    const selectedOption = modelSelect.options[modelSelect.selectedIndex];
-                    if (selectedOption && selectedOption.dataset.name) {
-                        modelNameInput.value = selectedOption.dataset.name;
-                    } else {
-                        modelNameInput.value = '';
-                    }
-                });
-            }
-        });
+        document.body.dataset.modelsUrl = "{{ url_for('files.api_models') }}";
     </script>
+    <script src="{{ url_for('static', filename='js/file-detail/model-loader.js') }}"></script>
 {% endblock %}

@@ -7,14 +7,16 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-@main_bp.route('/')
+
+@main_bp.route("/")
 @approval_required
 def index():
     """Redirect to upload page"""
-    return redirect(url_for('files.upload'))
+    return redirect(url_for("files.upload"))
 
-@main_bp.route('/health')
+
+@main_bp.route("/health")
 @csrf.exempt
 def health():
     """Health check endpoint"""
-    return {'status': 'ok'}
+    return {"status": "ok"}

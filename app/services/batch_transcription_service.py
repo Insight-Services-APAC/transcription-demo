@@ -14,9 +14,10 @@ class BatchTranscriptionService:
     Azure Batch Transcription REST API, using simple requests calls.
     """
 
-    def __init__(self, locale, subscription_key, region):
+    def __init__(self, subscription_key, region, locale=None):
         self.subscription_key = subscription_key
         self.region = region
+        self.locale = locale
         self.base_url = f'https://{region}.api.cognitive.microsoft.com/speechtotext'
         self.logger = logging.getLogger('app.services.transcription')
         if not subscription_key:
@@ -25,7 +26,7 @@ class BatchTranscriptionService:
             raise ValidationError('Azure Speech API region is required but was not provided. Check your .env and ensure AZURE_SPEECH_REGION is set.', field='region')
         self.logger.info(f'Initialized BatchTranscriptionService with region: {region}')
 
-    def submit_transcription(self, audio_url, enable_diarization=True, model_id=None):
+    def submit_transcription(self, audio_url, enable_diarization=True, model_id=None, locale=None):
         """
         Submit a transcription job using the optional custom/base model if provided.
         """
@@ -43,9 +44,15 @@ class BatchTranscriptionService:
             'punctuationMode': 'DictatedAndAutomatic',
             'profanityFilterMode': 'Masked'
         }
+        
+        # Use provided locale parameter or fall back to self.locale
+        use_locale = locale or self.locale
+        if not use_locale:
+            raise ValidationError('A locale must be provided for transcription', field='locale')
+            
         data = {
             'contentUrls': [audio_url],
-            'locale': 
+            'locale': use_locale,
             'displayName': os.path.basename(urlparse(audio_url).path),
             'properties': properties
         }
