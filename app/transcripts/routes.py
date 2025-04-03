@@ -109,14 +109,12 @@ def process_transcript_data(data):
     """Process transcript data into a frontend-friendly format"""
     if not data:
         raise ValidationError("Transcript data is empty or null", field="data")
-
     result = {
         "source": data.get("source", ""),
         "duration": data.get("duration", ""),
         "combinedResults": [],
         "segments": [],
     }
-
     if "combinedRecognizedPhrases" in data:
         result["combinedResults"] = [
             {
@@ -126,7 +124,6 @@ def process_transcript_data(data):
             }
             for item in data["combinedRecognizedPhrases"]
         ]
-
     if "recognizedPhrases" in data:
         segments = []
         for phrase in data["recognizedPhrases"]:
@@ -136,16 +133,12 @@ def process_transcript_data(data):
                 or len(phrase["nBest"]) == 0
             ):
                 continue
-
             best_result = phrase["nBest"][0]
-
-            # Convert PT format to user-friendly format
             offset_str = format_timestamp(phrase.get("offsetMilliseconds", 0))
             end_offset = phrase.get("offsetMilliseconds", 0) + phrase.get(
                 "durationMilliseconds", 0
             )
             end_str = format_timestamp(end_offset)
-
             segment = {
                 "start": offset_str,
                 "end": end_str,
@@ -156,7 +149,6 @@ def process_transcript_data(data):
                 "confidence": best_result.get("confidence", 0),
                 "words": [],
             }
-
             if "words" in best_result:
                 segment["words"] = [
                     {
@@ -171,11 +163,8 @@ def process_transcript_data(data):
                     }
                     for word in best_result["words"]
                 ]
-
             segments.append(segment)
-
         result["segments"] = sorted(segments, key=lambda x: x["offsetMilliseconds"])
-
     return result
 
 
@@ -199,16 +188,11 @@ def add_time_strings(time1, time2):
     """
 
     def to_seconds(time_str):
-        # Handle ISO 8601 duration format (e.g., PT1.5S)
         if time_str.startswith("PT") and time_str.endswith("S"):
-            # Extract the seconds value between PT and S
             try:
                 return float(time_str[2:-1])
             except ValueError:
-                # If conversion fails, return 0
                 return 0
-
-        # Handle HH:MM:SS or MM:SS format
         parts = time_str.split(":")
         if len(parts) == 3:
             h, m, s = parts

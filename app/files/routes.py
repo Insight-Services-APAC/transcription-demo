@@ -78,20 +78,16 @@ def start_transcription(file_id):
     if file.status in ["processing", "completed"]:
         flash(f"File is already {file.status}", "warning")
         return redirect(url_for("files.file_detail", file_id=file_id))
-
     model_id = request.form.get("model_id")
     model_name = request.form.get("model_name", "Default")
     model_locale = request.form.get("model_locale")
-
     if model_id:
         file.model_id = model_id
         file.model_name = model_name
-
     file.status = "processing"
     file.current_stage = "queued"
     file.progress_percent = 0.0
     db.session.commit()
-
     result = transcribe_file.delay(file_id, model_locale=model_locale)
     flash("Transcription started", "success")
     return redirect(url_for("files.file_detail", file_id=file_id))
@@ -193,7 +189,6 @@ def api_models():
     try:
         subscription_key = current_app.config.get("AZURE_SPEECH_KEY")
         region = current_app.config.get("AZURE_SPEECH_REGION")
-
         if not subscription_key or not region:
             logger.error("Azure Speech API configuration (Key or Region) is missing.")
             return (
@@ -202,9 +197,7 @@ def api_models():
                 ),
                 500,
             )
-
         service = BatchTranscriptionService(subscription_key, region)
-
         base_models = []
         try:
             base_models_response = service.list_models(model_type="base")
@@ -219,11 +212,8 @@ def api_models():
             logger.info(f"Retrieved {len(custom_models)} custom models")
         except Exception as e:
             logger.warning(f"Error retrieving custom models: {str(e)}")
-
         all_models_output = []
         latest_base_models_by_locale = {}
-
-        # 1. When processing base models, store the self URL
         for model in base_models:
             locale = model.get("locale")
             created_str = model.get("createdDateTime")
@@ -249,15 +239,12 @@ def api_models():
                     "description": model_description,
                     "type": "base",
                 }
-
-        # 2. When creating output model data for base models
         for locale, model_data in latest_base_models_by_locale.items():
             locale_str = model_data["locale"]
             description_part = (
                 model_data["description"] if model_data["description"] else "Default"
             )
             display_name = f"{locale_str}"
-
             all_models_output.append(
                 {
                     "id": model_data["id"],
@@ -267,29 +254,22 @@ def api_models():
                     "type": "base",
                 }
             )
-
-        # 3. When processing custom models
         for model in custom_models:
             locale_str = model.get("locale", "Unknown")
             name = model.get("name", "Unnamed")
             display_name = f"{locale_str} - Custom: {name}"
-
             all_models_output.append(
                 {
-                    "id": model.get("self", ""),  # CHANGED: Use self URL instead of id
+                    "id": model.get("self", ""),
                     "name": name,
                     "displayName": display_name,
                     "locale": locale_str,
                     "type": "custom",
                 }
             )
-
-        # 4. Sort the final list (by locale then name - No change here)
         all_models_output.sort(key=lambda m: (m.get("locale", ""), m.get("name", "")))
-
         logger.info(f"Returning {len(all_models_output)} processed models to the API.")
         return jsonify({"models": all_models_output})
-
     except Exception as e:
         logger.error(
             f"Unexpected error in api_models endpoint: {str(e)}", exc_info=True
@@ -318,15 +298,12 @@ def upload():
             raise ValidationError("No file selected", field="file")
         if not file.filename.lower().endswith((".mp3", ".wav")):
             raise ValidationError("Only .MP3 and .WAV files are allowed", field="file")
-
         model_id = request.form.get("transcription_model")
         model_name = request.form.get("transcription_model")
         model_locale = request.form.get("model_locale")
-
         logger.info(
             f"Selected model: {model_id} ({model_name}) with locale: {model_locale}"
         )
-
         filename = secure_filename(file.filename)
         try:
             tmp_path = os.path.join(current_app.config["UPLOAD_FOLDER"], filename)
@@ -351,22 +328,18 @@ def upload():
                 except Exception as e:
                     log_exception(e, logger)
                     logger.warning(f"Failed to update progress tracker: {str(e)}")
-
-                # Include model ID, name, and locale if provided
                 task_kwargs = {
                     "tmp_path": tmp_path,
                     "filename": filename,
                     "upload_id": upload_id,
                     "user_id": current_user.id,
                 }
-
                 if model_id:
                     task_kwargs["model_id"] = model_id
                     if model_name:
                         task_kwargs["model_name"] = model_name
                     if model_locale:
                         task_kwargs["model_locale"] = model_locale
-
                 task = upload_to_azure_task.delay(**task_kwargs)
                 return jsonify({"upload_id": upload_id, "task_id": task.id})
             try:
@@ -446,18 +419,13 @@ def start_upload():
             raise ValidationError("No file selected", field="file")
         if not file.filename.lower().endswith((".mp3", ".wav")):
             raise ValidationError("Only .MP3 and .WAV files are allowed", field="file")
-
-        # Get model selection if provided
         model_id = request.form.get("model_id")
         model_name = request.form.get("model_name")
         model_locale = request.form.get("model_locale")
-
-        # Log model info for debugging
         if model_id:
             logger.info(
                 f"Model selected - ID: {model_id}, Name: {model_name}, Locale: {model_locale}"
             )
-
         filename = secure_filename(file.filename)
         try:
             tmp_path = os.path.join(current_app.config["UPLOAD_FOLDER"], filename)
@@ -482,20 +450,16 @@ def start_upload():
             except Exception as e:
                 log_exception(e, logger)
                 logger.warning(f"Failed to update progress tracker: {str(e)}")
-
-            # Include model ID, name, and locale if provided
             task_kwargs = {
                 "tmp_path": tmp_path,
                 "filename": filename,
                 "upload_id": upload_id,
                 "user_id": current_user.id,
             }
-
             if model_id:
                 task_kwargs["model_id"] = model_id
                 task_kwargs["model_name"] = model_name
                 task_kwargs["model_locale"] = model_locale
-
             task = upload_to_azure_task.delay(**task_kwargs)
             return jsonify({"upload_id": upload_id, "task_id": task.id})
         except Exception as e:

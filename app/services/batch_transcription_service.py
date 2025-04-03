@@ -54,16 +54,13 @@ class BatchTranscriptionService:
         properties = {
             "timeToLiveHours": "12",
             "diarization": {"enabled": enable_diarization},
-            # For Whisper models, we use displayFormWordLevelTimestampsEnabled
             "wordLevelTimestampsEnabled": True,
             "displayFormWordLevelTimestampsEnabled": True,
             "punctuationMode": "DictatedAndAutomatic",
             "profanityFilterMode": "Masked",
         }
-
         use_locale = locale or self.locale or "en-US"
         self.logger.info(f"Using locale: {use_locale} for transcription")
-
         data = {
             "contentUrls": [audio_url],
             "locale": use_locale,
@@ -75,10 +72,8 @@ class BatchTranscriptionService:
             data["model"] = {"self": model_id}
         else:
             self.logger.info("Using default Whisper model")
-            # Construct the Whisper model URL based on the provided region.
             whisper_url = f"https://{self.region}.api.cognitive.microsoft.com/speechtotext/v3.2/models/base/e418c4a9-9937-4db7-b2c9-8afbff72d950"
             data["model"] = {"self": whisper_url}
-            # Remove wordLevelTimestampsEnabled as Whisper uses displayFormWordLevelTimestampsEnabled instead.
             data["properties"].pop("wordLevelTimestampsEnabled", None)
         headers = {
             "Ocp-Apim-Subscription-Key": self.subscription_key,
@@ -330,10 +325,9 @@ class BatchTranscriptionService:
         """
         models_list = {"values": []}
         skip = 0
-        top = 100  # Fetch in batches of 100
+        top = 100
         current_date = datetime.datetime.utcnow()
         total_models = 0
-
         while True:
             url = f"{self.base_url}/models/{model_type}?api-version=2024-11-15&skip={skip}&top={top}"
             self.logger.info(f"Retrieving {model_type} models from: {url}")
@@ -350,23 +344,16 @@ class BatchTranscriptionService:
                         service="azure_speech",
                         status_code=response.status_code,
                     )
-
                 batch = response.json()
                 batch_values = batch.get("values", [])
                 total_models += len(batch_values)
-
-                # If no more values, we're done
                 if not batch_values:
                     break
-
-                # Filter out deprecated models before adding to the results
                 for model in batch_values:
                     is_deprecated = False
                     deprecation_dates = model.get("properties", {}).get(
                         "deprecationDates", {}
                     )
-
-                    # Check transcription deprecation date
                     transcription_date_str = deprecation_dates.get(
                         "transcriptionDateTime"
                     )
@@ -381,27 +368,19 @@ class BatchTranscriptionService:
                                     f"Filtering out deprecated model: {model.get('displayName', 'Unknown')} (deprecated on {transcription_date_str})"
                                 )
                         except ValueError:
-                            # If date parsing fails, assume it's valid
                             self.logger.warning(
                                 f"Could not parse deprecation date: {transcription_date_str}"
                             )
-
                     if not is_deprecated:
                         models_list["values"].append(model)
-
-                # If there's no next link or if we've processed all pages, we're done
                 if "@nextLink" not in batch:
                     break
-
-                # Continue to next page
                 skip += top
-
             except requests.exceptions.RequestException as e:
                 log_exception(e, self.logger)
                 raise TranscriptionError(
                     f"Network error retrieving models: {str(e)}", service="azure_speech"
                 )
-
         self.logger.info(
             f"Retrieved {len(models_list.get('values', []))} non-deprecated models out of {total_models} total models."
         )

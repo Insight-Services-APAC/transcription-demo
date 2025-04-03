@@ -122,13 +122,10 @@ def upload_to_azure_task(
                 "stage": "preparing",
                 "start_time": time.time(),
             }
-
-            # Add model information if provided
             if model_id:
                 progress_data["model_id"] = model_id
                 progress_data["model_name"] = model_name
                 progress_data["model_locale"] = model_locale
-
             progress_tracker.update_progress(upload_id, progress_data)
         except Exception as e:
             logger.error(f"Error updating progress tracker: {str(e)}")
@@ -172,8 +169,6 @@ def upload_to_azure_task(
                 )
             try:
                 session = db.session
-
-                # Create file record with model information if provided
                 file_record = File(
                     filename=filename,
                     blob_url=blob_url,
@@ -184,7 +179,6 @@ def upload_to_azure_task(
                     model_id=model_id,
                     model_name=model_name if model_name else "Default",
                 )
-
                 session.add(file_record)
                 session.commit()
             except Exception as e:
