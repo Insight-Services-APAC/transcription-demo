@@ -133,15 +133,6 @@ def upload_to_azure_task(
 ):
     """
     Celery task to handle file upload to Azure Blob Storage.
-
-    Args:
-        tmp_path: Path to the local file
-        filename: Name of the file
-        upload_id: ID for tracking upload progress
-        user_id: ID of the user who uploaded the file
-        model_id: Optional ID of the model to use for transcription
-        model_name: Optional name of the model to use for transcription
-        model_locale: Optional locale of the model for transcription
     """
     logger.info(
         f"Starting upload task for {filename} (ID: {upload_id}, User: {user_id}, Model: {model_id}, Locale: {model_locale})"
@@ -171,13 +162,59 @@ def upload_to_azure_task(
         except Exception as e:
             logger.error(f"Error updating progress tracker: {str(e)}")
         try:
-            if not os.path.exists(tmp_path):
+            # Try different paths to find the file
+            original_path = tmp_path
+            file_found = False
+            
+            # List of potential paths to check
+            potential_paths = [
+                tmp_path,  # Original path as passed
+                os.path.abspath(tmp_path),  # Absolute version of original path
+                os.path.join(app.config["UPLOAD_FOLDER"], filename),  # File in configured upload folder
+                os.path.join(os.getcwd(), tmp_path),  # Path relative to current working directory
+                os.path.join(os.getcwd(), "uploads", filename),  # Common uploads folder location
+            ]
+            
+            # Try each path
+            for path in potential_paths:
+                logger.info(f"Checking for file at: {path}")
+                if os.path.exists(path) and os.path.isfile(path):
+                    logger.info(f"✅ File found at: {path}")
+                    tmp_path = path
+                    file_found = True
+                    break
+            
+            if not file_found:
+                # Debug information for troubleshooting
+                logger.error(f"❌ Could not find file at any of these locations:")
+                for path in potential_paths:
+                    logger.error(f"  - {path}")
+                
+                # Check if upload folder exists and list its contents
+                upload_folder = app.config["UPLOAD_FOLDER"]
+                logger.error(f"Upload folder config: {upload_folder}")
+                logger.error(f"Current working directory: {os.getcwd()}")
+                
+                try:
+                    if os.path.exists(upload_folder):
+                        logger.error(f"Upload folder contents: {os.listdir(upload_folder)}")
+                    else:
+                        logger.error(f"Upload folder does not exist at: {upload_folder}")
+                        # Try to create it for future uploads
+                        os.makedirs(upload_folder, exist_ok=True)
+                        logger.info(f"Created upload folder at: {upload_folder}")
+                except Exception as e:
+                    logger.error(f"Error accessing upload folder: {str(e)}")
+                
                 raise UploadError(
-                    f"File not found at path: {tmp_path}", filename=filename
+                    f"File not found at path: {original_path}", filename=filename
                 )
+            
             file_size = os.path.getsize(tmp_path)
             if file_size == 0:
                 raise UploadError(f"File is empty (0 bytes)", filename=filename)
+                
+            # Continue with the rest of the function as before
             try:
                 progress_tracker.update_progress(
                     upload_id,
