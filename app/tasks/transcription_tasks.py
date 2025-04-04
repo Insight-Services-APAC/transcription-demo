@@ -1,4 +1,3 @@
-# app/tasks/transcription_tasks.py
 import os
 import logging
 import time
@@ -85,32 +84,25 @@ def transcribe_file(file_id, model_locale=None):
                 "Missing Azure Speech API configuration. Check AZURE_SPEECH_KEY and AZURE_SPEECH_REGION.",
                 service="azure_speech",
             )
-
         transcription_service = BatchTranscriptionService(
             subscription_key, region, locale=model_locale
         )
-
-        # Check if a specific model is requested
         model_id = file.model_id
         if model_id:
             logger.info(
-                f'Using specified model: {model_id} ({file.model_name or "unknown"})'
+                f"Using specified model: {model_id} ({file.model_name or 'unknown'})"
             )
             if model_locale:
                 logger.info(f"Using locale: {model_locale}")
         else:
             logger.info("Using default model (no specific model requested)")
-
         logger.info(f"Submitting batch transcription for blob: {file.blob_url}")
-
-        # Pass the model_id to the transcription service if provided
         result_job = transcription_service.submit_transcription(
             audio_url=file.blob_url,
             enable_diarization=True,
             model_id=model_id,
             locale=model_locale,
         )
-
         transcription_id = result_job["id"]
         file.transcription_id = transcription_id
         db.session.commit()
@@ -163,14 +155,12 @@ def transcribe_file(file_id, model_locale=None):
                                 speakers.add(phrase["speaker"])
                         if speakers:
                             file.speaker_count = str(len(speakers))
-
-                        # Calculate average accuracy from word confidences
                         word_confidences = []
                         for phrase in result_json["recognizedPhrases"]:
                             if (
                                 phrase.get("recognitionStatus") == "Success"
                                 and phrase.get("nBest")
-                                and len(phrase["nBest"]) > 0
+                                and (len(phrase["nBest"]) > 0)
                             ):
                                 best_result = phrase["nBest"][0]
                                 if "words" in best_result:
@@ -179,11 +169,10 @@ def transcribe_file(file_id, model_locale=None):
                                             word_confidences.append(
                                                 word.get("confidence", 0)
                                             )
-
                         if word_confidences:
                             avg_accuracy = (
                                 sum(word_confidences) / len(word_confidences) * 100
-                            )  # Convert to percentage
+                            )
                             file.accuracy_percent = round(avg_accuracy, 2)
                             logger.info(
                                 f"Calculated average accuracy: {file.accuracy_percent}%"

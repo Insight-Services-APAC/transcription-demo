@@ -1,5 +1,8 @@
 #!/bin/bash
-cd "$(dirname "$0")/.." || exit 1
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+cd "$PROJECT_ROOT" || exit 1
 
 # Build a list of pruned paths from .gitignore
 PRUNE_ARGS=()

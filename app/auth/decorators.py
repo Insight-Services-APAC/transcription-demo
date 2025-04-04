@@ -37,13 +37,11 @@ def approval_required(f):
     def decorated_function(*args, **kwargs):
         if not current_user.is_authenticated:
             return redirect(url_for("auth.login", next=request.url))
-
-        if not current_user.is_admin and not current_user.is_approved:
+        if not current_user.is_admin and (not current_user.is_approved):
             logger.warning(
                 f"Unapproved user {current_user.username} attempted to access {request.path}"
             )
             return redirect(url_for("auth.pending_approval"))
-
         return f(*args, **kwargs)
 
     return decorated_function

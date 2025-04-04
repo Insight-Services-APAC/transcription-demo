@@ -15,10 +15,9 @@ def login():
     if current_user.is_authenticated:
         if current_user.is_temporary_password:
             return redirect(url_for("auth.change_password"))
-        if not current_user.is_approved and not current_user.is_admin:
+        if not current_user.is_approved and (not current_user.is_admin):
             return redirect(url_for("auth.pending_approval"))
         return redirect(url_for("main.index"))
-
     form = LoginForm()
     if form.validate_on_submit():
         user = User.query.filter(
@@ -31,28 +30,22 @@ def login():
                     "danger",
                 )
                 return render_template("auth/login.html", form=form)
-
-            # Check if user is approved (admins are always approved)
-            if not user.is_approved and not user.is_admin:
+            if not user.is_approved and (not user.is_admin):
                 login_user(user, remember=form.remember.data)
                 user.last_login = datetime.utcnow()
                 db.session.commit()
                 logger.info(f"User {user.username} logged in (pending approval)")
                 return redirect(url_for("auth.pending_approval"))
-
             login_user(user, remember=form.remember.data)
             user.last_login = datetime.utcnow()
             db.session.commit()
             logger.info(f"User {user.username} logged in successfully")
-
-            # Redirect to change password page if temporary password
             if user.is_temporary_password:
                 flash(
                     "You must change your temporary password before continuing.",
                     "warning",
                 )
                 return redirect(url_for("auth.change_password"))
-
             flash("Login successful!", "success")
             next_page = request.args.get("next")
             return redirect(next_page or url_for("main.index"))
@@ -90,7 +83,7 @@ def register():
             password=form.password.data,
             is_approved=False,
         )
-        user.is_temporary_password = False  # User-defined password
+        user.is_temporary_password = False
         db.session.add(user)
         db.session.commit()
         logger.info(f"New user registered: {user.username} (awaiting admin approval)")
@@ -105,15 +98,11 @@ def register():
 @auth_bp.route("/profile")
 @login_required
 def profile():
-    # Redirect to change password if temporary password
     if current_user.is_temporary_password:
         flash("You must change your temporary password before continuing.", "warning")
         return redirect(url_for("auth.change_password"))
-
-    # Redirect to pending approval page if not approved
-    if not current_user.is_approved and not current_user.is_admin:
+    if not current_user.is_approved and (not current_user.is_admin):
         return redirect(url_for("auth.pending_approval"))
-
     return render_template("auth/profile.html")
 
 
@@ -121,10 +110,8 @@ def profile():
 @login_required
 def pending_approval():
     """Page displayed to users whose accounts are pending admin approval"""
-    # If user is already approved or is admin, redirect to main page
     if current_user.is_approved or current_user.is_admin:
         return redirect(url_for("main.index"))
-
     return render_template("auth/pending_approval.html")
 
 
@@ -132,21 +119,14 @@ def pending_approval():
 @login_required
 def change_password():
     form = ChangePasswordForm()
-
     if form.validate_on_submit():
-        # Verify current password
         if not current_user.check_password(form.current_password.data):
             flash("Current password is incorrect.", "danger")
             return render_template("auth/change_password.html", form=form)
-
-        # Set new password
         current_user.set_password(form.new_password.data)
         current_user.is_temporary_password = False
         db.session.commit()
-
         logger.info(f"User {current_user.username} changed their password")
         flash("Your password has been updated successfully.", "success")
-
         return redirect(url_for("main.index"))
-
     return render_template("auth/change_password.html", form=form)

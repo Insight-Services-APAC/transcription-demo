@@ -1,4 +1,3 @@
-# app/models/file.py
 import uuid
 from datetime import datetime
 from app.extensions import db
@@ -21,7 +20,6 @@ class File(db.Model):
     speaker_count = db.Column(db.String(10), nullable=True)
     accuracy_percent = db.Column(db.Float, nullable=True)
     user_id = db.Column(db.String(36), db.ForeignKey("users.id"), nullable=True)
-    # New fields for model selection
     model_id = db.Column(db.String(255), nullable=True)
     model_name = db.Column(db.String(255), nullable=True)
 

@@ -35,26 +35,20 @@ def create_app(config_name="default"):
     from app.errors.middleware import init_middleware
 
     init_middleware(app)
-
-    # Initialize password change middleware
     from app.auth.middleware import init_password_middleware
 
     init_password_middleware(app)
-
-    # Import all blueprints
     from app.main import main_bp
     from app.files import files_bp
     from app.transcripts import transcripts_bp
     from app.auth import auth_bp
     from app.admin import admin_bp
 
-    # Register all blueprints
     app.register_blueprint(main_bp)
     app.register_blueprint(files_bp)
     app.register_blueprint(transcripts_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(admin_bp)
-
     app.celery = make_celery(app)
     from app.errors.csrf_handler import register_csrf_handler
 
