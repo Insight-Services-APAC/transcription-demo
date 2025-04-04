@@ -62,3 +62,5 @@ digest.txt
 .pytest_cache/
 
 output.txt
+
+run_azure_img.sh
