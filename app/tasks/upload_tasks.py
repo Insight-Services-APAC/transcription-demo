@@ -18,6 +18,9 @@ from app.errors.exceptions import (
     ValidationError,
 )
 from app.errors.logger import log_exception
+from dotenv import load_dotenv
+
+load_dotenv()
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("app.tasks.upload")
@@ -28,81 +31,94 @@ class UploadProgressTracker:
 
     def __init__(self, app=None):
         self.app = app or current_app._get_current_object()
+        self._fallback_progress_store = {}
         try:
-            # Use the new-style config name
-            redis_url = self.app.config.get("broker_url", "redis://localhost:6379/0")
+            # Try to get Redis URL from both new and old-style config keys
+            redis_url = os.environ.get("CELERY_BROKER_URL")
             
+            if not redis_url:
+                logger.warning("No Redis URL configured, using in-memory storage for progress tracking")
+                self.redis = None
+                return
+                
             # Log safely - don't show credentials in logs
             safe_url = redis_url
             if '@' in redis_url:
-                protocol, rest = redis_url.split('://', 1)
-                parts = rest.split('@', 1)
-                if len(parts) > 1:
-                    safe_url = f"{protocol}://*****@{parts[1]}"
+                parts = redis_url.split('@')
+                safe_url = parts[0].split(':')[0] + "://*****@" + parts[1]
                 
-            logger.info(f"Connecting to Redis: {safe_url}")
+            logger.info(f"Connecting to Redis for progress tracking: {safe_url}")
             
-            # Special handling for SSL connection to Azure Redis
+            # Use same connection parameters as Celery
+            from redis import Redis, from_url
             import ssl
-            from redis import from_url
             
             if redis_url.startswith('rediss://'):
-                # Create SSL context for secure Redis
-                ssl_context = ssl.create_default_context()
-                ssl_context.check_hostname = False
-                ssl_context.verify_mode = ssl.CERT_NONE
+                # Secure Redis connection (Azure Redis Cache)
+                # Parse the URL manually since we need SSL options
+                from urllib.parse import urlparse
+                parsed = urlparse(redis_url)
+                host = parsed.hostname
+                port = parsed.port or 6380
+                password = parsed.password
+                db = int(parsed.path.lstrip('/') or 0)
                 
-                # Parse the URL to remove the parameter 
-                if 'ssl_cert_reqs=CERT_NONE' in redis_url:
-                    clean_url = redis_url.replace('?ssl_cert_reqs=CERT_NONE', '')
-                    if '&ssl_cert_reqs=CERT_NONE' in clean_url:
-                        clean_url = clean_url.replace('&ssl_cert_reqs=CERT_NONE', '')
-                        
-                    self.redis = from_url(clean_url, ssl=ssl_context)
-                else:
-                    self.redis = from_url(redis_url, ssl=True, ssl_cert_reqs=ssl.CERT_NONE)
+                self.redis = Redis(
+                    host=host,
+                    port=port,
+                    password=password,
+                    db=db,
+                    ssl=True,
+                    ssl_cert_reqs=None  # Equivalent to ssl.CERT_NONE
+                )
             else:
+                # Regular Redis connection
                 self.redis = from_url(redis_url)
                 
-            logger.info(f"Redis connected successfully")
+            # Test the connection
+            self.redis.ping()
+            logger.info("Redis connected successfully for progress tracking")
+            
         except Exception as e:
-            log_exception(e, logger)
-            logger.error(f"Error initializing Redis connection: {str(e)}")
-            # Fallback storage
-            self._fallback_progress_store = {}
+            logger.error(f"Redis connection failed, using in-memory fallback: {str(e)}")
+            self.redis = None
 
     def update_progress(self, upload_id, progress_data):
         if not upload_id:
             raise ValidationError("Upload ID is required", field="upload_id")
         if not progress_data:
             raise ValidationError("Progress data is required", field="progress_data")
+        
+        progress_data["last_update"] = time.time()
+        
         try:
-            progress_data["last_update"] = time.time()
-            self.redis.setex(
-                f"upload_progress:{upload_id}", 3600, json.dumps(progress_data)
-            )
+            if self.redis:
+                # Store in Redis if available
+                self.redis.setex(
+                    f"upload_progress:{upload_id}", 3600, json.dumps(progress_data)
+                )
+            else:
+                # Fall back to in-memory storage
+                self._fallback_progress_store[upload_id] = progress_data
         except Exception as e:
-            logger.error(f"Error updating progress in Redis: {str(e)}")
-            self._fallback_progress_store = getattr(
-                self, "_fallback_progress_store", {}
-            )
+            logger.error(f"Error storing progress in Redis, using fallback: {str(e)}")
             self._fallback_progress_store[upload_id] = progress_data
 
     def get_progress(self, upload_id):
         if not upload_id:
             raise ValidationError("Upload ID is required", field="upload_id")
-        try:
-            data = self.redis.get(f"upload_progress:{upload_id}")
-            if data:
-                return json.loads(data)
-            fallback_store = getattr(self, "_fallback_progress_store", {})
-            return fallback_store.get(upload_id)
-        except Exception as e:
-            logger.error(f"Error getting progress from Redis: {str(e)}")
-            fallback_store = getattr(self, "_fallback_progress_store", {})
-            return fallback_store.get(upload_id)
-        return None
-
+        
+        # Try Redis first if available
+        if self.redis:
+            try:
+                data = self.redis.get(f"upload_progress:{upload_id}")
+                if data:
+                    return json.loads(data)
+            except Exception as e:
+                logger.error(f"Error retrieving progress from Redis: {str(e)}")
+        
+        # Fall back to in-memory storage
+        return self._fallback_progress_store.get(upload_id)
 
 @shared_task(bind=True)
 def upload_to_azure_task(

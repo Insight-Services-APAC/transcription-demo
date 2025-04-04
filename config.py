@@ -5,13 +5,6 @@ load_dotenv()
 basedir = os.path.abspath(os.path.dirname(__file__))
 
 
-import os
-from dotenv import load_dotenv
-
-load_dotenv()
-basedir = os.path.abspath(os.path.dirname(__file__))
-
-
 class Config:
     SECRET_KEY = os.environ.get("SECRET_KEY", "dev-key-for-demo")
     SQLALCHEMY_DATABASE_URI = os.environ.get(
@@ -26,10 +19,8 @@ class Config:
     AZURE_SPEECH_KEY = os.environ.get("AZURE_SPEECH_KEY")
     AZURE_SPEECH_REGION = os.environ.get("AZURE_SPEECH_REGION", "eastus")
     
-    # Use only new-style configuration keys
     broker_url = os.environ.get("CELERY_BROKER_URL", "redis://localhost:6379/0")
     result_backend = os.environ.get("CELERY_RESULT_BACKEND", "redis://localhost:6379/0")
-    broker_connection_retry_on_startup = True
     
     CHUNK_SIZE_SECONDS = int(os.environ.get("CHUNK_SIZE_SECONDS", 30))
     CHUNK_OVERLAP_SECONDS = int(os.environ.get("CHUNK_OVERLAP_SECONDS", 5))
@@ -37,7 +28,6 @@ class Config:
     LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO")
     LOG_FILE = os.environ.get("LOG_FILE", os.path.join(basedir, "logs", "app.log"))
     PROPAGATE_EXCEPTIONS = False
-
 
 class DevelopmentConfig(Config):
     DEBUG = True
@@ -56,8 +46,6 @@ class TestingConfig(Config):
     SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
     WTF_CSRF_ENABLED = False
     SERVER_NAME = "localhost.localdomain"
-    CELERY_BROKER_URL = "memory://"
-    CELERY_RESULT_BACKEND = "memory://"
 
 
 config = {
