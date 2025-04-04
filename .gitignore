@@ -64,3 +64,5 @@ digest.txt
 output.txt
 
 run_azure_img.sh
+
+template.json

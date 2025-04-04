@@ -53,6 +53,9 @@ def transcribe_file(file_id, model_locale=None):
     """
     logger.info(f"=== Starting transcription pipeline for file {file_id} ===")
     start_time = time.time()
+    
+    # Create new session to avoid transaction conflicts
+    file = None
     try:
         file = db.session.query(File).filter(File.id == file_id).first()
         if not file:
@@ -64,18 +67,25 @@ def transcribe_file(file_id, model_locale=None):
             "status": "error",
             "message": f"Database error looking up file: {str(e)}",
         }
+        
+    # Update file status with safe transaction handling
     try:
-        file.status = "processing"
-        file.current_stage = "transcribing"
-        file.progress_percent = 10
-        db.session.commit()
+        # Use session.begin() for automatic transaction management
+        with db.session.begin():
+            # Refresh the object to ensure we have the latest state
+            file.status = "processing"
+            file.current_stage = "transcribing"
+            file.progress_percent = 10
         logger.info(f"File {file_id} set to processing state.")
     except Exception as e:
         log_exception(e, logger)
+        db.session.rollback()  # Explicit rollback on error
+        logger.error(f"Failed to update file status, rolled back transaction: {str(e)}")
         return {
             "status": "error",
             "message": f"Database error updating file status: {str(e)}",
         }
+    
     try:
         subscription_key = current_app.config["AZURE_SPEECH_KEY"]
         region = current_app.config["AZURE_SPEECH_REGION"]
@@ -104,10 +114,25 @@ def transcribe_file(file_id, model_locale=None):
             locale=model_locale,
         )
         transcription_id = result_job["id"]
-        file.transcription_id = transcription_id
-        db.session.commit()
-        file.progress_percent = 50
-        db.session.commit()
+        
+        try:
+            with db.session.begin():
+                file.transcription_id = transcription_id
+            logger.info(f"Updated file with transcription_id: {transcription_id}")
+        except Exception as e:
+            log_exception(e, logger)
+            db.session.rollback()
+            logger.error(f"Failed to update transcription ID, continuing anyway: {str(e)}")
+        
+        try:
+            with db.session.begin():
+                file.progress_percent = 50
+            logger.info(f"Updated progress to 50% for file {file_id}")
+        except Exception as e:
+            log_exception(e, logger)
+            db.session.rollback()
+            logger.error(f"Failed to update progress, continuing anyway: {str(e)}")
+            
         max_attempts = 120
         for attempt in range(max_attempts):
             status_info = transcription_service.get_transcription_status(
@@ -119,12 +144,30 @@ def transcribe_file(file_id, model_locale=None):
             )
             if status == "Running":
                 progress = min(50 + attempt / max_attempts * 40, 90)
-                file.progress_percent = progress
-                db.session.commit()
+                try:
+                    with db.session.begin():
+                        file = db.session.query(File).filter(File.id == file_id).first()
+                        if file:
+                            file.progress_percent = progress
+                    logger.info(f"Updated progress to {progress:.1f}% for file {file_id}")
+                except Exception as e:
+                    log_exception(e, logger)
+                    db.session.rollback()
+                    logger.error(f"Failed to update progress, continuing anyway: {str(e)}")
+                    
             if status == "Succeeded":
                 logger.info("Transcription succeeded; fetching final JSON result.")
-                file.progress_percent = 95
-                db.session.commit()
+                try:
+                    with db.session.begin():
+                        file = db.session.query(File).filter(File.id == file_id).first()
+                        if file:
+                            file.progress_percent = 95
+                    logger.info(f"Updated progress to 95% for file {file_id}")
+                except Exception as e:
+                    log_exception(e, logger)
+                    db.session.rollback()
+                    logger.error(f"Failed to update progress, continuing anyway: {str(e)}")
+                    
                 logger.info(
                     "Retrieving final transcription JSON for job %s", transcription_id
                 )
@@ -139,47 +182,65 @@ def transcribe_file(file_id, model_locale=None):
                 transcript_url = blob_service.upload_bytes(
                     text_json.encode("utf-8"), json_blob_path, "application/json"
                 )
-                file.transcript_url = transcript_url
-                file.status = "completed"
-                file.progress_percent = 100
+                
                 try:
-                    if "durationInTicks" in result_json:
-                        duration_seconds = result_json["durationInTicks"] / 10000000.0
-                        file.duration_seconds = str(
-                            timedelta(seconds=int(duration_seconds))
-                        )
-                    if "recognizedPhrases" in result_json:
-                        speakers = set()
-                        for phrase in result_json["recognizedPhrases"]:
-                            if "speaker" in phrase:
-                                speakers.add(phrase["speaker"])
-                        if speakers:
-                            file.speaker_count = str(len(speakers))
-                        word_confidences = []
-                        for phrase in result_json["recognizedPhrases"]:
-                            if (
-                                phrase.get("recognitionStatus") == "Success"
-                                and phrase.get("nBest")
-                                and (len(phrase["nBest"]) > 0)
-                            ):
-                                best_result = phrase["nBest"][0]
-                                if "words" in best_result:
-                                    for word in best_result["words"]:
-                                        if "confidence" in word:
-                                            word_confidences.append(
-                                                word.get("confidence", 0)
-                                            )
-                        if word_confidences:
-                            avg_accuracy = (
-                                sum(word_confidences) / len(word_confidences) * 100
-                            )
-                            file.accuracy_percent = round(avg_accuracy, 2)
-                            logger.info(
-                                f"Calculated average accuracy: {file.accuracy_percent}%"
-                            )
-                except Exception as meta_err:
-                    logger.error(f"Metadata extraction error: {str(meta_err)}")
-                db.session.commit()
+                    # Use session.begin() for automatic transaction management
+                    with db.session.begin():
+                        file = db.session.query(File).filter(File.id == file_id).first()
+                        if not file:
+                            logger.error(f"File {file_id} no longer exists in database")
+                            raise ResourceNotFoundError(f"File with ID {file_id} not found")
+                        
+                        file.transcript_url = transcript_url
+                        file.status = "completed"
+                        file.progress_percent = 100
+                        
+                        # Extract metadata from the transcript
+                        try:
+                            if "durationInTicks" in result_json:
+                                duration_seconds = result_json["durationInTicks"] / 10000000.0
+                                file.duration_seconds = str(
+                                    timedelta(seconds=int(duration_seconds))
+                                )
+                            if "recognizedPhrases" in result_json:
+                                speakers = set()
+                                for phrase in result_json["recognizedPhrases"]:
+                                    if "speaker" in phrase:
+                                        speakers.add(phrase["speaker"])
+                                if speakers:
+                                    file.speaker_count = str(len(speakers))
+                                word_confidences = []
+                                for phrase in result_json["recognizedPhrases"]:
+                                    if (
+                                        phrase.get("recognitionStatus") == "Success"
+                                        and phrase.get("nBest")
+                                        and (len(phrase["nBest"]) > 0)
+                                    ):
+                                        best_result = phrase["nBest"][0]
+                                        if "words" in best_result:
+                                            for word in best_result["words"]:
+                                                if "confidence" in word:
+                                                    word_confidences.append(
+                                                        word.get("confidence", 0)
+                                                    )
+                                if word_confidences:
+                                    avg_accuracy = (
+                                        sum(word_confidences) / len(word_confidences) * 100
+                                    )
+                                    file.accuracy_percent = round(avg_accuracy, 2)
+                                    logger.info(
+                                        f"Calculated average accuracy: {file.accuracy_percent}%"
+                                    )
+                        except Exception as meta_err:
+                            logger.error(f"Metadata extraction error: {str(meta_err)}")
+                    
+                    logger.info(f"Successfully updated file record with transcript data")
+                except Exception as db_error:
+                    log_exception(db_error, logger)
+                    db.session.rollback()
+                    logger.error(f"Database error saving transcript data: {str(db_error)}")
+                    # Even though DB update failed, we completed transcription
+                    
                 total_time = time.time() - start_time
                 logger.info(
                     f"Transcription pipeline completed for file {file_id} in {total_time:.2f} seconds."
@@ -193,41 +254,91 @@ def transcribe_file(file_id, model_locale=None):
                 error = status_info.get("properties", {}).get("error", {})
                 error_message = error.get("message", "Unknown error")
                 logger.error(f"Transcription failed for {file_id}: {error_message}")
-                file.status = "error"
-                file.error_message = f"Transcription failed: {error_message}"
-                db.session.commit()
+                
+                try:
+                    with db.session.begin():
+                        file = db.session.query(File).filter(File.id == file_id).first()
+                        if file:
+                            file.status = "error"
+                            file.error_message = f"Transcription failed: {error_message}"
+                    logger.info(f"Updated file status to error")
+                except Exception as e:
+                    log_exception(e, logger)
+                    db.session.rollback()
+                    logger.error(f"Failed to update file error status: {str(e)}")
+                
                 return {"status": "error", "message": error_message}
             time.sleep(60)
+        
         logger.error(f"Transcription timed out for {file_id} after 2 hours.")
-        file.status = "error"
-        file.error_message = "Transcription timed out after 2 hours"
-        db.session.commit()
+        try:
+            with db.session.begin():
+                file = db.session.query(File).filter(File.id == file_id).first()
+                if file:
+                    file.status = "error"
+                    file.error_message = "Transcription timed out after 2 hours"
+            logger.info(f"Updated file status to error (timeout)")
+        except Exception as e:
+            log_exception(e, logger)
+            db.session.rollback()
+            logger.error(f"Failed to update file error status: {str(e)}")
+            
         return {"status": "error", "message": "Transcription timed out"}
     except TranscriptionError as te:
         logger.error(f"TranscriptionError in task for file {file_id}: {str(te)}")
-        file.status = "error"
-        file.error_message = str(te)
-        db.session.commit()
+        try:
+            with db.session.begin():
+                file = db.session.query(File).filter(File.id == file_id).first()
+                if file:
+                    file.status = "error"
+                    file.error_message = str(te)
+            logger.info(f"Updated file status to error (TranscriptionError)")
+        except Exception as e:
+            log_exception(e, logger)
+            db.session.rollback()
+            logger.error(f"Failed to update file error status: {str(e)}")
+            
         return {"status": "error", "message": str(te), "code": te.error_code}
     except StorageError as se:
         logger.error(f"StorageError in task for file {file_id}: {str(se)}")
-        file.status = "error"
-        file.error_message = str(se)
-        db.session.commit()
+        try:
+            with db.session.begin():
+                file = db.session.query(File).filter(File.id == file_id).first()
+                if file:
+                    file.status = "error"
+                    file.error_message = str(se)
+            logger.info(f"Updated file status to error (StorageError)")
+        except Exception as e:
+            log_exception(e, logger)
+            db.session.rollback()
+            logger.error(f"Failed to update file error status: {str(e)}")
+            
         return {"status": "error", "message": str(se), "code": se.error_code}
     except DatabaseError as de:
         logger.error(f"DatabaseError in task for file {file_id}: {str(de)}")
         try:
-            file.status = "error"
-            file.error_message = str(de)
-            db.session.commit()
+            with db.session.begin():
+                file = db.session.query(File).filter(File.id == file_id).first()
+                if file:
+                    file.status = "error"
+                    file.error_message = str(de)
         except:
+            db.session.rollback()
             pass
         return {"status": "error", "message": str(de), "code": de.error_code}
     except Exception as e:
         logger.error(f"Unhandled exception in task for file {file_id}: {str(e)}")
         logger.error(traceback.format_exc())
-        file.status = "error"
-        file.error_message = f"Unexpected error: {str(e)}"
-        db.session.commit()
+        try:
+            with db.session.begin():
+                file = db.session.query(File).filter(File.id == file_id).first()
+                if file:
+                    file.status = "error"
+                    file.error_message = f"Unexpected error: {str(e)}"
+            logger.info(f"Updated file status to error (unexpected exception)")
+        except Exception as db_err:
+            log_exception(db_err, logger)
+            db.session.rollback()
+            logger.error(f"Failed to update file error status: {str(db_err)}")
+            
         return {"status": "error", "message": str(e)}

@@ -31,17 +31,15 @@ def handle_app_error(error):
     if hasattr(error, "payload") and error.payload:
         logger.error(f"Additional info: {error.payload}")
     if is_api_request():
-        response = error.to_dict()
-        response.status_code = error.status_code
-        return response
+        # Return the error dictionary with the correct status code
+        return jsonify(error.to_dict()), error.status_code
     flash(error.message, "danger")
     if error.status_code == 404:
-        return (render_template("errors/404.html"), 404)
+        return render_template("errors/404.html"), 404
     elif error.status_code in (401, 403):
-        return (render_template("errors/403.html"), error.status_code)
+        return render_template("errors/403.html"), error.status_code
     else:
-        return (render_template("errors/500.html"), error.status_code)
-
+        return render_template("errors/500.html"), error.status_code
 
 def handle_http_exception(error):
     """Handle Werkzeug's HTTPExceptions."""
@@ -74,14 +72,14 @@ def handle_generic_exception(error):
         else:
             msg = "An unexpected error occurred"
             detail = None
-        response = {
+        response_dict = {
             "status": "error",
             "error": {"code": "server_error", "message": msg, "detail": detail},
         }
-        response.status_code = 500
-        return response
+        # Return the error dictionary with status code 500
+        return jsonify(response_dict), 500
     flash("An unexpected error occurred", "danger")
-    return (render_template("errors/500.html"), 500)
+    return render_template("errors/500.html"), 500
 
 
 def register_handlers(app):
