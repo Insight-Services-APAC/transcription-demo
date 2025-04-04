@@ -296,8 +296,8 @@ def upload():
         file = request.files["file"]
         if file.filename == "":
             raise ValidationError("No file selected", field="file")
-        if not file.filename.lower().endswith((".mp3", ".wav")):
-            raise ValidationError("Only .MP3 and .WAV files are allowed", field="file")
+        # if not file.filename.lower().endswith((".mp3", ".wav")):
+        #     raise ValidationError("Only .MP3 and .WAV files are allowed", field="file")
         model_id = request.form.get("transcription_model")
         model_name = request.form.get("transcription_model")
         model_locale = request.form.get("model_locale")
@@ -417,8 +417,8 @@ def start_upload():
         file = request.files["file"]
         if file.filename == "":
             raise ValidationError("No file selected", field="file")
-        if not file.filename.lower().endswith((".mp3", ".wav")):
-            raise ValidationError("Only .MP3 and .WAV files are allowed", field="file")
+        # if not file.filename.lower().endswith((".mp3", ".wav")):
+        #     raise ValidationError("Only .MP3 and .WAV files are allowed", field="file")
         model_id = request.form.get("model_id")
         model_name = request.form.get("model_name")
         model_locale = request.form.get("model_locale")

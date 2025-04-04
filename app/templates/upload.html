@@ -11,7 +11,7 @@
                 <div class="card-body p-4">
                     <h2 class="card-title fw-bold mb-4">Upload Audio File</h2>
                     <div class="alert alert-light border-start border-4 border-primary mb-4">
-                        <p class="mb-0">Upload a .MP3 or .WAV file (up to 5GB) for transcription and speaker diarization.</p>
+                        <p class="mb-0">Upload an audio file (up to 5GB) for transcription and speaker diarization.</p>
                     </div>
                     <form method="POST"
                           action="{{ url_for('files.upload') }}"
@@ -28,7 +28,6 @@
                                        id="file"
                                        name="file"
                                        type="file"
-                                       accept=".mp3,.wav"
                                        required>
                                 <div class="py-5" id="dropAreaContent">
                                     <i class="fas fa-cloud-upload-alt fa-3x text-primary mb-3"></i>
@@ -42,7 +41,9 @@
                                     <p class="text-muted file-size mt-2" id="selectedFileSize"></p>
                                 </div>
                             </div>
-                            <div class="form-text mt-2">Only .MP3 and .WAV format files are accepted.</div>
+                            <div class="form-text mt-2">
+                                Accepted audio formats: WAV, MP3, OPUS/OGG, FLAC, WMA, AAC, ALAW in WAV container, MULAW in WAV container, AMR, WebM, M4A, SPEEX.
+                            </div>
                         </div>
                         <div class="mb-4">
                             <label for="transcription_model" class="form-label">Transcription Model</label>

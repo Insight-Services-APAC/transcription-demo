@@ -35,50 +35,53 @@ class UploadProgressTracker:
         try:
             # Try to get Redis URL from both new and old-style config keys
             redis_url = os.environ.get("CELERY_BROKER_URL")
-            
+
             if not redis_url:
-                logger.warning("No Redis URL configured, using in-memory storage for progress tracking")
+                logger.warning(
+                    "No Redis URL configured, using in-memory storage for progress tracking"
+                )
                 self.redis = None
                 return
-                
+
             # Log safely - don't show credentials in logs
             safe_url = redis_url
-            if '@' in redis_url:
-                parts = redis_url.split('@')
-                safe_url = parts[0].split(':')[0] + "://*****@" + parts[1]
-                
+            if "@" in redis_url:
+                parts = redis_url.split("@")
+                safe_url = parts[0].split(":")[0] + "://*****@" + parts[1]
+
             logger.info(f"Connecting to Redis for progress tracking: {safe_url}")
-            
+
             # Use same connection parameters as Celery
             from redis import Redis, from_url
             import ssl
-            
-            if redis_url.startswith('rediss://'):
+
+            if redis_url.startswith("rediss://"):
                 # Secure Redis connection (Azure Redis Cache)
                 # Parse the URL manually since we need SSL options
                 from urllib.parse import urlparse
+
                 parsed = urlparse(redis_url)
                 host = parsed.hostname
                 port = parsed.port or 6380
                 password = parsed.password
-                db = int(parsed.path.lstrip('/') or 0)
-                
+                db = int(parsed.path.lstrip("/") or 0)
+
                 self.redis = Redis(
                     host=host,
                     port=port,
                     password=password,
                     db=db,
                     ssl=True,
-                    ssl_cert_reqs=None  # Equivalent to ssl.CERT_NONE
+                    ssl_cert_reqs=None,  # Equivalent to ssl.CERT_NONE
                 )
             else:
                 # Regular Redis connection
                 self.redis = from_url(redis_url)
-                
+
             # Test the connection
             self.redis.ping()
             logger.info("Redis connected successfully for progress tracking")
-            
+
         except Exception as e:
             logger.error(f"Redis connection failed, using in-memory fallback: {str(e)}")
             self.redis = None
@@ -88,9 +91,9 @@ class UploadProgressTracker:
             raise ValidationError("Upload ID is required", field="upload_id")
         if not progress_data:
             raise ValidationError("Progress data is required", field="progress_data")
-        
+
         progress_data["last_update"] = time.time()
-        
+
         try:
             if self.redis:
                 # Store in Redis if available
@@ -107,7 +110,7 @@ class UploadProgressTracker:
     def get_progress(self, upload_id):
         if not upload_id:
             raise ValidationError("Upload ID is required", field="upload_id")
-        
+
         # Try Redis first if available
         if self.redis:
             try:
@@ -116,9 +119,10 @@ class UploadProgressTracker:
                     return json.loads(data)
             except Exception as e:
                 logger.error(f"Error retrieving progress from Redis: {str(e)}")
-        
+
         # Fall back to in-memory storage
         return self._fallback_progress_store.get(upload_id)
+
 
 @shared_task(bind=True)
 def upload_to_azure_task(
@@ -161,20 +165,69 @@ def upload_to_azure_task(
             progress_tracker.update_progress(upload_id, progress_data)
         except Exception as e:
             logger.error(f"Error updating progress tracker: {str(e)}")
+
+        # Create upload directory if it doesn't exist
+        upload_folder = app.config["UPLOAD_FOLDER"]
+        os.makedirs(upload_folder, exist_ok=True)
+
         try:
             # Try different paths to find the file
             original_path = tmp_path
             file_found = False
-            
-            # List of potential paths to check
+
+            # Log more diagnostic information
+            logger.info(f"Current working directory: {os.getcwd()}")
+            logger.info(f"Upload folder config: {upload_folder}")
+            logger.info(f"Original file path: {original_path}")
+
+            # Check if upload folder exists
+            if not os.path.exists(upload_folder):
+                logger.warning(
+                    f"Upload folder doesn't exist, creating: {upload_folder}"
+                )
+                try:
+                    os.makedirs(upload_folder, exist_ok=True)
+                except Exception as e:
+                    logger.error(f"Failed to create upload folder: {str(e)}")
+
+            # Try to create a normalized absolute path
+            try:
+                # If the path is already absolute, we'll use it directly
+                if os.path.isabs(tmp_path):
+                    normalized_path = tmp_path
+                else:
+                    # Otherwise, we'll try to construct a path relative to the app
+                    normalized_path = os.path.join(
+                        app.root_path, upload_folder, filename
+                    )
+
+                logger.info(f"Normalized file path: {normalized_path}")
+            except Exception as e:
+                logger.error(f"Error normalizing path: {str(e)}")
+                normalized_path = tmp_path
+
+            # List of potential paths to check - we've added more options
             potential_paths = [
                 tmp_path,  # Original path as passed
                 os.path.abspath(tmp_path),  # Absolute version of original path
-                os.path.join(app.config["UPLOAD_FOLDER"], filename),  # File in configured upload folder
-                os.path.join(os.getcwd(), tmp_path),  # Path relative to current working directory
-                os.path.join(os.getcwd(), "uploads", filename),  # Common uploads folder location
+                normalized_path,  # Normalized path
+                os.path.join(app.root_path, tmp_path),  # Relative to app root
+                os.path.join(upload_folder, filename),  # In configured upload folder
+                os.path.join(
+                    os.getcwd(), upload_folder, filename
+                ),  # Path relative to CWD
+                os.path.join(
+                    os.path.dirname(app.root_path), upload_folder, filename
+                ),  # Path relative to parent of app root
+                os.path.join(
+                    "/app", upload_folder, filename
+                ),  # Common Docker container path
+                os.path.join("/app/uploads", filename),  # Default Docker container path
             ]
-            
+
+            # Remove any duplicate paths
+            potential_paths = list(set(potential_paths))
+
             # Try each path
             for path in potential_paths:
                 logger.info(f"Checking for file at: {path}")
@@ -183,37 +236,53 @@ def upload_to_azure_task(
                     tmp_path = path
                     file_found = True
                     break
-            
+
             if not file_found:
                 # Debug information for troubleshooting
                 logger.error(f"❌ Could not find file at any of these locations:")
                 for path in potential_paths:
                     logger.error(f"  - {path}")
-                
+
                 # Check if upload folder exists and list its contents
-                upload_folder = app.config["UPLOAD_FOLDER"]
-                logger.error(f"Upload folder config: {upload_folder}")
                 logger.error(f"Current working directory: {os.getcwd()}")
-                
+
                 try:
                     if os.path.exists(upload_folder):
-                        logger.error(f"Upload folder contents: {os.listdir(upload_folder)}")
+                        logger.error(
+                            f"Upload folder contents: {os.listdir(upload_folder)}"
+                        )
                     else:
-                        logger.error(f"Upload folder does not exist at: {upload_folder}")
-                        # Try to create it for future uploads
-                        os.makedirs(upload_folder, exist_ok=True)
-                        logger.info(f"Created upload folder at: {upload_folder}")
+                        logger.error(
+                            f"Upload folder does not exist at: {upload_folder}"
+                        )
                 except Exception as e:
                     logger.error(f"Error accessing upload folder: {str(e)}")
-                
-                raise UploadError(
-                    f"File not found at path: {original_path}", filename=filename
-                )
-            
+
+                # Use default path as a fallback and see if we can write to it
+                fallback_path = os.path.join(app.root_path, "uploads", filename)
+                logger.info(f"Using fallback path: {fallback_path}")
+
+                # Ensure the directory exists
+                os.makedirs(os.path.dirname(fallback_path), exist_ok=True)
+
+                # Check if we can access the upload folder
+                try:
+                    with open(fallback_path, "w") as f:
+                        f.write("test")
+                    logger.info(f"Successfully created test file at: {fallback_path}")
+                    os.remove(fallback_path)
+                    logger.info(f"Successfully removed test file")
+                except Exception as e:
+                    logger.error(f"Failed to create test file: {str(e)}")
+
+                # Modify the error message to include action steps
+                error_msg = f"File not found at path: {original_path}. Check that the 'uploads' directory exists and has write permissions."
+                raise UploadError(error_msg, filename=filename)
+
             file_size = os.path.getsize(tmp_path)
             if file_size == 0:
                 raise UploadError(f"File is empty (0 bytes)", filename=filename)
-                
+
             # Continue with the rest of the function as before
             try:
                 progress_tracker.update_progress(

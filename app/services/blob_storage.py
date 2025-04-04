@@ -311,11 +311,20 @@ class BlobStorageService(ServiceBase):
             return self.upload_progress.get(upload_id, None)
 
     def _get_content_type(self, file_path):
-        """Pick a simple content type based on file extension."""
+        """Return content type based on file extension for supported audio formats."""
         extension = os.path.splitext(file_path)[1].lower()
         content_types = {
-            ".wav": "audio/wav",
+            ".wav": "audio/wav",  # Covers WAV, ALAW/MULAW in WAV container
             ".mp3": "audio/mpeg",
+            ".ogg": "audio/ogg",  # Covers OPUS/OGG
+            ".opus": "audio/ogg",
+            ".flac": "audio/flac",
+            ".wma": "audio/x-ms-wma",
+            ".aac": "audio/aac",
+            ".amr": "audio/amr",
+            ".webm": "audio/webm",
+            ".m4a": "audio/mp4",
+            ".spx": "audio/speex",  # SPEEX typically uses .spx extension
             ".json": "application/json",
             ".txt": "text/plain",
         }

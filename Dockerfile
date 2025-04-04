@@ -43,26 +43,14 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN pip install --no-cache-dir gunicorn
 
 # Create necessary directories
-RUN mkdir -p instance uploads logs
+RUN mkdir -p /app/instance /app/uploads /app/logs \
+    && chmod 777 /app/instance /app/uploads /app/logs
 
 # Copy application code
 COPY . /app/
 
 # Set up supervisor configuration
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
-
-# Set permissions for directories
-RUN chmod -R 755 /app/uploads /app/logs /app/instance
-
-# Create non-root user for security
-RUN adduser --disabled-password --gecos '' appuser
-RUN chown -R appuser:appuser /app
-
-# Switch to non-root user but preserve access to ODBC drivers
-USER appuser
-
-# Make ODBC configuration accessible to non-root user
-ENV ODBCSYSINI=/etc
 
 # Expose port
 EXPOSE $PORT
