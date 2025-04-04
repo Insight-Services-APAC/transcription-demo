@@ -1,5 +1,7 @@
 #!/bin/bash
 
+cd "$(dirname "$0")/.." || exit 1
+
 # Read .gitignore and create a list of directories to prune
 PRUNE_ARGS=()
 while IFS= read -r line; do

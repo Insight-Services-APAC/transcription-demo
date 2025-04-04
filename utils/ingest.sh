@@ -1,3 +1,7 @@
+#!/bin/bash
+
+cd "$(dirname "$0")/.." || exit 1
+
 gitingest . \
   -e "__pycache__/" \
   -e "*.pyc" \

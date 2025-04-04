@@ -1,4 +1,5 @@
 #!/bin/bash
+cd "$(dirname "$0")/.." || exit 1
 
 # Build a list of pruned paths from .gitignore
 PRUNE_ARGS=()

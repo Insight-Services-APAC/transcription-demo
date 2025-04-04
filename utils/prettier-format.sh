@@ -1,4 +1,5 @@
 #!/bin/bash
+cd "$(dirname "$0")/.." || exit 1
 
 # Read .gitignore and build prune arguments for find
 PRUNE_ARGS=()
