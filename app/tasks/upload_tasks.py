@@ -29,22 +29,47 @@ class UploadProgressTracker:
     def __init__(self, app=None):
         self.app = app or current_app._get_current_object()
         try:
-            redis_url = self.app.config.get("broker_url") or self.app.config.get(
-                "CELERY_BROKER_URL", "redis://localhost:6379/0"
-            )
-            if redis_url.startswith("redis://"):
-                parts = redis_url.replace("redis://", "").split("/")
-                host_port = parts[0].split(":")
-                host = host_port[0] or "localhost"
-                port = int(host_port[1]) if len(host_port) > 1 else 6379
-                db_index = int(parts[1]) if len(parts) > 1 else 0
-                self.redis = Redis(host=host, port=port, db=db_index)
+            # Use the new-style config name
+            redis_url = self.app.config.get("broker_url", "redis://localhost:6379/0")
+            
+            # Log safely - don't show credentials in logs
+            safe_url = redis_url
+            if '@' in redis_url:
+                protocol, rest = redis_url.split('://', 1)
+                parts = rest.split('@', 1)
+                if len(parts) > 1:
+                    safe_url = f"{protocol}://*****@{parts[1]}"
+                
+            logger.info(f"Connecting to Redis: {safe_url}")
+            
+            # Special handling for SSL connection to Azure Redis
+            import ssl
+            from redis import from_url
+            
+            if redis_url.startswith('rediss://'):
+                # Create SSL context for secure Redis
+                ssl_context = ssl.create_default_context()
+                ssl_context.check_hostname = False
+                ssl_context.verify_mode = ssl.CERT_NONE
+                
+                # Parse the URL to remove the parameter 
+                if 'ssl_cert_reqs=CERT_NONE' in redis_url:
+                    clean_url = redis_url.replace('?ssl_cert_reqs=CERT_NONE', '')
+                    if '&ssl_cert_reqs=CERT_NONE' in clean_url:
+                        clean_url = clean_url.replace('&ssl_cert_reqs=CERT_NONE', '')
+                        
+                    self.redis = from_url(clean_url, ssl=ssl_context)
+                else:
+                    self.redis = from_url(redis_url, ssl=True, ssl_cert_reqs=ssl.CERT_NONE)
             else:
-                self.redis = Redis(host="localhost", port=6379, db=0)
+                self.redis = from_url(redis_url)
+                
+            logger.info(f"Redis connected successfully")
         except Exception as e:
             log_exception(e, logger)
             logger.error(f"Error initializing Redis connection: {str(e)}")
-            self.redis = Redis(host="localhost", port=6379, db=0)
+            # Fallback storage
+            self._fallback_progress_store = {}
 
     def update_progress(self, upload_id, progress_data):
         if not upload_id:

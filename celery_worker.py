@@ -1,9 +1,11 @@
-import app.models
 import os
+import app.models
 from dotenv import load_dotenv
-from app import create_app
 
 load_dotenv()
+
+from app import create_app
+
 env = os.environ.get("FLASK_ENV", "development")
 flask_app = create_app(env)
 celery = flask_app.celery
