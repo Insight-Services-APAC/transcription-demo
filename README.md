@@ -1,130 +1,105 @@
-# Audio Transcription Application
+# NSWCC Transcription Demo
 
-A robust Flask-based web application for transcribing audio files using Azure Speech Services, with speaker diarization capabilities to identify different speakers within recordings.
+A web application for automated audio transcription with speaker recognition using Azure Speech Services. This application provides a user-friendly interface for uploading audio files, processing them with Azure's Speech-to-Text service, and viewing the resulting transcripts with synchronized audio playback.
 
 ## Overview
 
-This application provides a complete end-to-end solution for audio transcription:
+The NSWCC Transcription Demo is designed to streamline the process of converting speech to text, with particular emphasis on multi-speaker environments. It leverages Azure Cognitive Services for high-quality transcription and speaker diarization (identifying who said what).
 
-- **User Authentication**: Secure registration and login system
-- **File Upload**: Support for MP3 and WAV audio files up to 5GB
-- **Asynchronous Processing**: Background task handling using Celery and Redis
-- **Cloud Storage**: Azure Blob Storage for reliable file management
-- **Speech Recognition**: Azure Speech Services for accurate transcription
-- **Speaker Diarization**: Automatic identification of different speakers
-- **Interactive Transcript Viewer**: Synchronized audio playback with transcript highlighting
+The application features a complete user authentication system, file management, asynchronous processing, and a sophisticated transcript player that allows users to navigate through transcribed content while listening to the corresponding audio.
 
-## Key Features
+## Features
 
-- User account management with secure authentication
-- Drag-and-drop file uploading with progress tracking
-- Real-time processing status updates
-- Interactive transcript viewer with synchronized audio playback
-- Word-level timestamp navigation and confidence scoring
-- Multi-speaker identification and highlighting
-- Responsive web design for desktop and mobile use
+- **User Authentication & Authorization**
+  - User registration with admin approval workflow
+  - Role-based access control (admin/standard users)
+  - Secure password management with temporary password flows
 
-## Project Structure
+- **File Management**
+  - Support for WAV and MP3 audio uploads (up to 5GB)
+  - Drag-and-drop file upload with progress tracking
+  - Browse and manage uploaded files
 
-### Core Components
+- **Transcription Processing**
+  - Integration with Azure Speech Services for speech-to-text conversion
+  - Speaker diarization to distinguish between different speakers
+  - Multiple transcription model support with language locale options
+  - Background processing with status tracking
 
-- **app.py**: Main application entry point
-- **celery_worker.py**: Background task worker initialization
-- **config.py**: Configuration settings for different environments (dev, production, testing)
+- **Transcript Viewing**
+  - Interactive transcript player with synchronized audio playback
+  - Word-level highlighting and navigation
+  - Speaker segmentation with visual differentiation
+  - Confidence scoring for transcribed content
 
-### Application Modules
+- **Administration**
+  - User management dashboard for administrators
+  - Create, approve, deactivate, and delete user accounts
+  - Password reset functionality
 
-#### Auth Module
-- **auth/routes.py**: Login, registration, and profile management
-- **auth/forms.py**: Form validation for authentication 
-- **models/user.py**: User account data model
+## System Architecture
 
-#### Files Module
-- **files/routes.py**: File management endpoints
-- **files/uploads.py**: File upload handling
-- **files/progress.py**: Upload progress tracking
-- **models/file.py**: File metadata and status model
+The application is built using a Flask backend with a Bootstrap-based frontend. It employs a celery worker for handling asynchronous tasks such as file uploads and transcription processing. Files are stored in Azure Blob Storage, and the transcription is performed via Azure Speech Services.
 
-#### Transcription Pipeline
-- **services/batch_transcription_service.py**: Azure Speech Service integration
-- **services/blob_storage.py**: Azure Blob Storage integration
-- **tasks/transcription_tasks.py**: Asynchronous transcription processing
-- **tasks/upload_tasks.py**: Background file upload handling
-- **transcripts/routes.py**: Transcript viewing and processing
+### Key Components
 
-#### Error Handling
-- **errors/handlers.py**: Centralized error handling
-- **errors/exceptions.py**: Custom exception definitions
-- **errors/logger.py**: Structured logging
-- **errors/middleware.py**: Request processing middleware
+#### Backend (Python/Flask)
 
-### Frontend Interface
+- **Flask Application**
+  - `app.py`: Main application entry point
+  - `config.py`: Configuration settings for different environments
+  - `celery_worker.py`: Celery worker for background task processing
 
-- **templates/**: HTML templates for all views
-- **static/css/**: Stylesheets for the application
-- **static/js/**: JavaScript modules with component-based architecture
-  - **file-upload/**: Upload management components
-  - **file-progress/**: Progress tracking components
-  - **transcript-player/**: Interactive transcript player
-  - **utils/**: Shared utility functions
+- **Application Modules**
+  - `app/__init__.py`: Flask application factory
+  - `app/extensions.py`: Flask extensions (SQLAlchemy, CSRFProtect, etc.)
+  - `app/models/`: Database models for users and files
+  - `app/admin/`: Admin panel functionality
+  - `app/auth/`: Authentication and user management
+  - `app/errors/`: Error handling and logging
+  - `app/files/`: File upload and management
+  - `app/transcripts/`: Transcript generation and viewing
+  - `app/services/`: External service integrations (Azure Blob Storage, Azure Speech)
+  - `app/tasks/`: Celery tasks for asynchronous processing
 
-## Technical Details
+#### Frontend
 
-The application is built with:
+- **Templates**
+  - Base templates and layout in `app/templates/`
+  - Feature-specific templates for auth, files, transcripts, etc.
 
-- **Flask**: Web framework
-- **SQLAlchemy**: Database ORM
-- **Celery**: Distributed task queue
-- **Redis**: Message broker and caching
-- **Azure Speech API**: Transcription service
-- **Azure Blob Storage**: File storage
-- **Bootstrap 5**: Frontend styling
-- **Modern JavaScript**: Component-based architecture
+- **Static Assets**
+  - CSS: Style sheets for UI components
+  - JavaScript:
+    - `file-upload/`: Handling file uploads with progress tracking
+    - `file-detail/`: File information display
+    - `transcript-player/`: Interactive transcript player
+    - `utils/`: Utility functions
 
-## Getting Started
+#### External Services
 
-### Prerequisites
+- **Azure Blob Storage**: For storing uploaded audio files and generated transcripts
+- **Azure Speech Services**: For speech-to-text processing and speaker diarization
+- **Redis**: For Celery task queue and progress tracking
+- **SQLite/PostgreSQL**: Database for storing application data
 
-- Python 3.8+
-- Redis server
-- Azure account with:
-  - Azure Speech Services subscription
-  - Azure Blob Storage account
+## Technology Stack
 
-### Environment Variables
-
-The application requires the following environment variables:
-
-```
-FLASK_ENV=development
-SECRET_KEY=your-secret-key
-AZURE_STORAGE_CONNECTION_STRING=your-storage-connection-string
-AZURE_SPEECH_KEY=your-speech-api-key
-AZURE_SPEECH_REGION=eastus
-```
-
-### Installation
-
-1. Clone the repository
-2. Install dependencies:
-   ```
-   pip install -r requirements.txt
-   ```
-3. Initialize the database:
-   ```
-   flask db upgrade
-   ```
-4. Start Redis server
-5. Run the debug server:
-   ```
-   ./run_debug.sh
-   ```
+- **Backend**: Python 3, Flask, SQLAlchemy, Celery
+- **Frontend**: HTML5, CSS, JavaScript, Bootstrap 5
+- **Storage**: Azure Blob Storage, SQLite/PostgreSQL
+- **Services**: Azure Speech Services (Batch Transcription API)
+- **Infrastructure**: Redis for task queue
 
 ## Usage Flow
 
-1. Register for a new account or login
-2. Upload an audio file (MP3 or WAV)
-3. The file will be uploaded to Azure Blob Storage
-4. Azure Speech Service will process the file for transcription
-5. Once complete, view the interactive transcript with the audio player
-6. Navigate through the transcript by clicking on sections or individual words
+1. Users register and await admin approval
+2. Once approved, users can upload audio files (MP3 or WAV)
+3. Users can optionally select a specific transcription model
+4. Files are uploaded to Azure Blob Storage
+5. Transcription is processed asynchronously by Azure Speech Services
+6. Users can monitor processing status on the file detail page
+7. Once complete, users can view the transcript with synchronized audio playback
+8. Transcript view shows speaker segments and word-level confidence
+
+This application provides a complete end-to-end solution for speech transcription with a focus on usability, reliability, and accuracy.
